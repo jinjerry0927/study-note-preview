@@ -1,0 +1,179 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+f:"/study-note-preview/_next/static/chunks/21rnqlt94y00x.js"
+10:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+11:"/study-note-preview/_next/static/chunks/2ijkwwfkomdi4.js"
+12:"GroupFunctionsPage"
+13:I[20608,["$2","$f","$10","$11"],"$12"]
+1b:"ViewportBoundary"
+1c:I[97367,["$2"],"$1b"]
+1d:"MetadataBoundary"
+1e:I[97367,["$2"],"$1d"]
+1f:"$Sreact.suspense"
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+6:X
+9:X
+9:C
+14:T52c5,-- 06V SQLite 재현용 독립 데이터. Oracle/PostgreSQL의 ROLLUP 구문이 아니다.
+CREATE TABLE sales (
+  sale_id INTEGER PRIMARY KEY,
+  region TEXT,
+  category TEXT NOT NULL,
+  amount INTEGER NOT NULL CHECK (amount >= 0)
+);
+INSERT INTO sales (sale_id, region, category, amount) VALUES
+  (1, '서울', '책', 100),
+  (2, '서울', '문구', 50),
+  (3, '부산', '책', 80),
+  (4, '부산', '문구', 20),
+  (5, NULL, '책', 30);
+
+-- 아래 40개 SELECT는 SQLite에서 실행되는 교육용 동등 의미 모형이다.
+-- Oracle/PostgreSQL의 GROUP BY ROLLUP/CUBE/GROUPING SETS를 SQLite에서 직접 실행한 것이 아니다.
+-- g_region=1: 지역 열이 그 집계 수준의 GROUP BY에 없음. g_category=1: 품목 열이 없음.
+-- gid=g_region*2+g_category 는 Oracle GROUPING_ID(region,category)/PostgreSQL GROUPING(region,category)와 같은 플래그 값이다.
+
+-- A1: 매출 원본 5행
+SELECT sale_id, region, category, amount FROM sales ORDER BY sale_id;
+
+-- A2: 전체 매출 280
+SELECT SUM(amount) AS total, COUNT(*) AS sales_count FROM sales;
+
+-- A3: 지역별 집계 세 그룹
+SELECT region, SUM(amount) AS total, COUNT(*) AS sales_count FROM sales GROUP BY region ORDER BY region IS NULL, region;
+
+-- A4: 품목별 집계 두 그룹
+SELECT category, SUM(amount) AS total, COUNT(*) AS sales_count FROM sales GROUP BY category ORDER BY category;
+
+-- A5: 지역·품목 상세 다섯 그룹
+SELECT region, category, SUM(amount) AS total, COUNT(*) AS sales_count FROM sales GROUP BY region, category ORDER BY region IS NULL, region, category;
+
+-- B1: ROLLUP 상세 그룹
+SELECT * FROM (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- B2: ROLLUP 지역 소계
+SELECT * FROM (SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- B3: ROLLUP 전체 총계
+SELECT * FROM (SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- B4: ROLLUP(region, category) 재현
+SELECT * FROM (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- B5: ROLLUP(category, region) 재현
+SELECT * FROM (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- C1: CUBE 상세 5그룹
+SELECT * FROM (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- C2: CUBE 지역 소계 3그룹
+SELECT * FROM (SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- C3: CUBE 품목 소계 2그룹
+SELECT * FROM (SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- C4: CUBE(region, category) 재현
+SELECT * FROM (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- C5: 마스크별 CUBE 행 수
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT gid, COUNT(*) AS group_rows, SUM(total) AS level_amount FROM cube GROUP BY gid ORDER BY gid;
+
+-- D1: 선택 집계 지역만
+SELECT * FROM (SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- D2: 선택 집계 품목만
+SELECT * FROM (SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- D3: 선택 집계 총계만
+SELECT * FROM (SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- D4: GROUPING SETS 세 종류 재현
+SELECT * FROM (SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- D5: 상세·품목·총계 선택
+SELECT * FROM (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- E1: GROUPING 값 0/1의 의미
+WITH rollup AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT region, category, g_region, g_category, gid, total FROM rollup WHERE region='서울' ORDER BY gid, category;
+
+-- E2: 지역 소계 마스크 1
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT region, category, g_region, g_category, gid, total FROM cube WHERE gid=1 ORDER BY region IS NULL, region;
+
+-- E3: 품목 소계 마스크 2
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT region, category, g_region, g_category, gid, total FROM cube WHERE gid=2 ORDER BY category;
+
+-- E4: 전체 총계 마스크 3
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT region, category, g_region, g_category, gid, total FROM cube WHERE gid=3;
+
+-- E5: 마스크와 수준 표
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT gid, MIN(g_region) AS g_region, MIN(g_category) AS g_category, COUNT(*) AS group_rows FROM cube GROUP BY gid ORDER BY gid;
+
+-- F1: 실제 region NULL의 상세행
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT region, category, total, g_region, g_category, gid FROM cube WHERE gid=0 AND region IS NULL;
+
+-- F2: region NULL의 지역 소계
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT region, category, total, g_region, g_category, gid FROM cube WHERE gid=1 AND region IS NULL;
+
+-- F3: 품목 책의 소계 NULL
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT region, category, total, g_region, g_category, gid FROM cube WHERE gid=2 AND category='책';
+
+-- F4: NULL 대신 소계 표시 만들기
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT CASE WHEN g_region=1 THEN '모든 지역' WHEN region IS NULL THEN '지역 미입력' ELSE region END AS region_label, CASE WHEN g_category=1 THEN '모든 품목' ELSE category END AS category_label, total, gid FROM cube WHERE region IS NULL ORDER BY gid, category;
+
+-- F5: 표시상 NULL·NULL 비교
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT region, category, total, g_region, g_category, gid FROM cube WHERE region IS NULL AND category IS NULL ORDER BY gid, total;
+
+-- G1: 일반 GROUP BY(region,category)
+SELECT region, category, SUM(amount) AS total FROM sales GROUP BY region, category ORDER BY region IS NULL, region, category;
+
+-- G2: 일반 GROUP BY(category,region)
+SELECT region, category, SUM(amount) AS total FROM sales GROUP BY category, region ORDER BY region IS NULL, region, category;
+
+-- G3: ROLLUP(region,category)
+SELECT * FROM (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- G4: ROLLUP(category,region)
+SELECT * FROM (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- G5: 비트 인수 순서 교환
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT gid AS gid_region_category, (g_category*2+g_region) AS gid_category_region, g_region, g_category, COUNT(*) AS group_rows FROM cube GROUP BY gid, g_region, g_category ORDER BY gid;
+
+-- H1: WHERE 필터 뒤 ROLLUP
+SELECT * FROM (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales WHERE amount >= 50 GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales WHERE amount >= 50 GROUP BY region UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales WHERE amount >= 50) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- H2: HAVING 지역 소계 선택
+SELECT region, SUM(amount) AS total FROM sales GROUP BY region HAVING SUM(amount)>=100 ORDER BY region;
+
+-- H3: 품목 단일 열 ROLLUP 재현
+SELECT * FROM (SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+
+-- H4: 입력 0행의 빈 그룹 총계
+SELECT COUNT(*) AS sales_count, SUM(amount) AS total FROM sales WHERE amount > 999;
+
+-- H5: CUBE 총괄 보고서
+WITH cube AS (SELECT region AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 0 AS g_category, 0 AS gid FROM sales GROUP BY region, category UNION ALL SELECT region AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 0 AS g_region, 1 AS g_category, 1 AS gid FROM sales GROUP BY region UNION ALL SELECT NULL AS region, category AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 0 AS g_category, 2 AS gid FROM sales GROUP BY category UNION ALL SELECT NULL AS region, NULL AS category, SUM(amount) AS total, COUNT(*) AS sales_count, 1 AS g_region, 1 AS g_category, 3 AS gid FROM sales) SELECT CASE WHEN g_region=1 THEN '모든 지역' WHEN region IS NULL THEN '지역 미입력' ELSE region END AS region_label, CASE WHEN g_category=1 THEN '모든 품목' ELSE category END AS category_label, total, gid FROM cube ORDER BY gid, region IS NULL, region, category IS NULL, category, total;
+e:[["children",{"s":"__PAGE__","h":160,"d":{"r":["$","$1","c",{"children":[["$","$L13",null,{"fullSql":"$14"}],["$L15","$L16","$L17","$L18"],"$L19"]}],"p":"$@1a","v":null,"s":"$6"}}]]
+c:[["children",{"s":"group-functions","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@d","v":"$9","s":"$6"},"c":"$Qe"}]]
+a:[["children",{"s":"learn","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@b","v":"$9","s":"$6"},"c":"$Qc"}]]
+7:[["children",{"s":"sqld","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@8","v":"$9","s":"$6"},"c":"$Qa"}]]
+0:{"t":{"t":{"s":"","h":80,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}],"notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]]}]}]}]]}],"p":"$@5","v":null,"s":"$6"},"c":"$Q7"},"h":{"r":["$","$1","h",{"children":[null,["$","$L1c",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","$L1e",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$1f",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"그룹 함수 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":"$@20","v":null,"s":"$6"}},"a":"$@21","u":"$@22","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+23:I[97367,["$2"],"OutletBoundary"]
+:HL["/study-note-preview/_next/static/chunks/2nsz8agl67zav.css","style"]
+15:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/2nsz8agl67zav.css","precedence":"next"}]
+16:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/21rnqlt94y00x.js","async":true}]
+17:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true}]
+18:["$","script","script-2",{"src":"/study-note-preview/_next/static/chunks/2ijkwwfkomdi4.js","async":true}]
+19:["$","$L23",null,{"children":["$","$1f",null,{"name":"Next.MetadataOutlet","children":"$@24"}]}]
+6:300
+24:null
+22:true
+6:C
+21:0
+d:"$undefined"
+b:"$undefined"
+8:"$undefined"
+5:"$undefined"
+20:"$undefined"
+1a:"$undefined"

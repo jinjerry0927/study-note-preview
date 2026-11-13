@@ -1,0 +1,222 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+f:"/study-note-preview/_next/static/chunks/1ifood9jrl2ng.js"
+10:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+11:I[24565,["$2","$f","$10"],"DmlPage"]
+19:"ViewportBoundary"
+1a:I[97367,["$2"],"$19"]
+1b:"MetadataBoundary"
+1c:I[97367,["$2"],"$1b"]
+1d:"$Sreact.suspense"
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+6:X
+9:X
+9:C
+12:T50f,-- 06AB DML v1.0: 교육용 가상 학생 관리 DB. 모든 시나리오는 이 초기 상태에서 독립 실행한다.
+PRAGMA foreign_keys = ON;
+CREATE TABLE study_departments (department_id TEXT PRIMARY KEY, department_name TEXT NOT NULL);
+INSERT INTO study_departments VALUES ('D10','컴퓨터'),('D20','통계');
+CREATE TABLE study_students (
+ student_id TEXT PRIMARY KEY,
+ student_name TEXT NOT NULL,
+ department_id TEXT REFERENCES study_departments(department_id),
+ study_hours INTEGER NOT NULL DEFAULT 0 CHECK(study_hours >= 0),
+ memo TEXT,
+ status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','paused'))
+);
+INSERT INTO study_students(student_id,student_name,department_id,study_hours,memo,status) VALUES
+ ('S101','민지','D10',5,NULL,'active'),
+ ('S102','준호','D20',7,'기초','active'),
+ ('S103','서연','D10',8,'복습','paused'),
+ ('S104','지훈','D20',9,NULL,'active'),
+ ('S105','유나',NULL,6,NULL,'active');
+CREATE TABLE incoming_students(student_id TEXT PRIMARY KEY,student_name TEXT NOT NULL,department_id TEXT,study_hours INTEGER);
+INSERT INTO incoming_students VALUES ('S106','하늘','D10',4),('S107','다은','D20',3);
+CREATE TABLE study_flags(flag_id INTEGER PRIMARY KEY,flag_name TEXT NOT NULL DEFAULT '미확인',is_active INTEGER NOT NULL DEFAULT 1);
+13:T2cff,-- 06AB: 각 코드의 SQL은 별도 초기 DB에서 실행해야 함. 이 파일은 읽기형 인덱스입니다.
+-- sqlite3 :memory: 에서 06AB_SQLITE_SETUP.sql을 실행한 다음 원하는 코드의 문장만 실행하세요.
+-- 오류가 예상되는 예제는 sqlite3 콘솔에서 오류 메시지를 관찰합니다.
+
+-- A1 | 변경 전 원본 확인 | 기대 오류: 없음
+SELECT student_id, student_name FROM study_students ORDER BY student_id;
+-- 결과 확인: SELECT student_id, student_name FROM study_students ORDER BY student_id;
+
+-- A2 | VALUES로 한 행 삽입 | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name,department_id,study_hours) VALUES ('S108','현우','D10',2);
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- A3 | 열 생략 시 기본값 | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name) VALUES ('S109','채린');
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- A4 | 명시적인 NULL 입력 | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name,memo) VALUES ('S110','도윤',NULL);
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- A5 | INSERT SELECT 두 행 | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name,department_id,study_hours) SELECT student_id,student_name,department_id,study_hours FROM incoming_students;
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- B1 | 여러 VALUES 행 삽입 | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name) VALUES ('S111','예린'),('S112','태오');
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- B2 | PRIMARY KEY 중복 실패 | 기대 오류: UNIQUE constraint failed
+INSERT INTO study_students(student_id,student_name) VALUES ('S101','중복');
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- B3 | NOT NULL 위반 실패 | 기대 오류: NOT NULL constraint failed
+INSERT INTO study_students(student_id,student_name) VALUES ('S113',NULL);
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- B4 | CHECK 위반 실패 | 기대 오류: CHECK constraint failed
+INSERT INTO study_students(student_id,student_name,study_hours) VALUES ('S114','규리',-1);
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- B5 | FOREIGN KEY 실패 | 기대 오류: FOREIGN KEY constraint failed
+INSERT INTO study_students(student_id,student_name,department_id) VALUES ('S115','하민','D99');
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- C1 | ID 한 명 UPDATE | 기대 오류: 없음
+UPDATE study_students SET study_hours=10 WHERE student_id='S101';
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- C2 | 부서별 UPDATE | 기대 오류: 없음
+UPDATE study_students SET status='paused' WHERE department_id='D20';
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- C3 | WHERE 없는 전체 UPDATE | 기대 오류: 없음
+UPDATE study_students SET study_hours=0;
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- C4 | 현재값을 이용한 UPDATE | 기대 오류: 없음
+UPDATE study_students SET study_hours=study_hours+2 WHERE department_id='D10';
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- C5 | 대상 없는 UPDATE | 기대 오류: 없음
+UPDATE study_students SET study_hours=99 WHERE student_id='S999';
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- D1 | WHERE를 사용한 한 행 삭제 | 기대 오류: 없음
+DELETE FROM study_students WHERE student_id='S103';
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- D2 | 두 대상 DELETE | 기대 오류: 없음
+DELETE FROM study_students WHERE department_id='D20';
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- D3 | WHERE 없는 DELETE | 기대 오류: 없음
+DELETE FROM study_students;
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- D4 | 삭제 대상 없음 | 기대 오류: 없음
+DELETE FROM study_students WHERE student_id='S999';
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- D5 | IS NULL로 정확한 삭제 | 기대 오류: 없음
+DELETE FROM study_students WHERE department_id IS NULL;
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- E1 | DEFAULT와 NULL 비교 | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name) VALUES ('S201','기본'); INSERT INTO study_students(student_id,student_name,memo) VALUES ('S202','명시NULL',NULL);
+-- 결과 확인: SELECT student_id, study_hours, memo, status FROM study_students WHERE student_id IN ('S201','S202') ORDER BY student_id;
+
+-- E2 | DEFAULT VALUES | 기대 오류: 없음
+INSERT INTO study_flags DEFAULT VALUES;
+-- 결과 확인: SELECT flag_id,flag_name,is_active FROM study_flags ORDER BY flag_id;
+
+-- E3 | UPDATE로 NULL 지정 | 기대 오류: 없음
+UPDATE study_students SET memo=NULL WHERE student_id='S102';
+-- 결과 확인: SELECT student_id,memo FROM study_students WHERE student_id='S102';
+
+-- E4 | COALESCE로 NULL 메모 처리 | 기대 오류: 없음
+UPDATE study_students SET memo=COALESCE(memo,'없음') WHERE department_id='D10';
+-- 결과 확인: SELECT student_id,memo FROM study_students WHERE department_id='D10' ORDER BY student_id;
+
+-- E5 | 조건 비교에서 NULL 함정 | 기대 오류: 없음
+UPDATE study_students SET status='paused' WHERE department_id=NULL;
+-- 결과 확인: SELECT student_id,department_id,status FROM study_students ORDER BY student_id;
+
+-- F1 | UPSERT 충돌 시 UPDATE | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name,study_hours) VALUES('S101','민지',12) ON CONFLICT(student_id) DO UPDATE SET study_hours=excluded.study_hours;
+-- 결과 확인: SELECT student_id,study_hours FROM study_students WHERE student_id='S101';
+
+-- F2 | UPSERT 새로운 키는 INSERT | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name,study_hours) VALUES('S210','다솔',4) ON CONFLICT(student_id) DO UPDATE SET study_hours=excluded.study_hours;
+-- 결과 확인: SELECT student_id,student_name,study_hours FROM study_students WHERE student_id='S210';
+
+-- F3 | 충돌 시 DO NOTHING | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name) VALUES('S101','무시') ON CONFLICT(student_id) DO NOTHING;
+-- 결과 확인: SELECT student_id,student_name FROM study_students WHERE student_id='S101';
+
+-- F4 | 다중 행 UPSERT 분기 | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name,study_hours) VALUES ('S102','준호',11),('S211','소율',3) ON CONFLICT(student_id) DO UPDATE SET study_hours=excluded.study_hours;
+-- 결과 확인: SELECT student_id,student_name,study_hours FROM study_students WHERE student_id IN ('S102','S211') ORDER BY student_id;
+
+-- F5 | 업서트 분기 수를 먼저 관찰 | 기대 오류: 없음
+SELECT src.student_id,CASE WHEN dst.student_id IS NULL THEN 'INSERT 후보' ELSE 'UPDATE 후보' END AS branch FROM incoming_students src LEFT JOIN study_students dst ON src.student_id=dst.student_id ORDER BY src.student_id;
+-- 결과 확인: SELECT src.student_id,CASE WHEN dst.student_id IS NULL THEN 'INSERT 후보' ELSE 'UPDATE 후보' END AS branch FROM incoming_students src LEFT JOIN study_students dst ON src.student_id=dst.student_id ORDER BY src.student_id;
+
+-- G1 | UPDATE CHECK 위반 | 기대 오류: CHECK constraint failed
+UPDATE study_students SET study_hours=-1 WHERE student_id='S101';
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- G2 | UPDATE UNIQUE 위반 | 기대 오류: UNIQUE constraint failed
+UPDATE study_students SET student_id='S101' WHERE student_id='S102';
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- G3 | UPDATE FK 위반 | 기대 오류: FOREIGN KEY constraint failed
+UPDATE study_students SET department_id='D99' WHERE student_id='S101';
+-- 결과 확인: SELECT student_id, student_name, department_id, study_hours, memo, status FROM study_students ORDER BY student_id;
+
+-- G4 | ROLLBACK으로 변경 취소 | 기대 오류: 없음
+BEGIN; UPDATE study_students SET study_hours=99 WHERE student_id='S101'; ROLLBACK;
+-- 결과 확인: SELECT student_id,study_hours FROM study_students WHERE student_id='S101';
+
+-- G5 | COMMIT으로 변경 확정 | 기대 오류: 없음
+BEGIN; UPDATE study_students SET study_hours=99 WHERE student_id='S101'; COMMIT;
+-- 결과 확인: SELECT student_id,study_hours FROM study_students WHERE student_id='S101';
+
+-- H1 | 수정 전 COUNT 확인 | 기대 오류: 없음
+SELECT COUNT(*) AS target_count FROM study_students WHERE department_id='D20';
+-- 결과 확인: SELECT COUNT(*) AS target_count FROM study_students WHERE department_id='D20';
+
+-- H2 | 서브쿼리로 UPDATE 대상 선정 | 기대 오류: 없음
+UPDATE study_students SET status='paused' WHERE department_id IN (SELECT department_id FROM study_departments WHERE department_name='컴퓨터');
+-- 결과 확인: SELECT student_id,status FROM study_students WHERE department_id='D10' ORDER BY student_id;
+
+-- H3 | 서브쿼리로 DELETE 대상 선정 | 기대 오류: 없음
+DELETE FROM study_students WHERE department_id IN (SELECT department_id FROM study_departments WHERE department_name='통계');
+-- 결과 확인: SELECT student_id,department_id FROM study_students ORDER BY student_id;
+
+-- H4 | RETURNING으로 INSERT 결과 확인 | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name,study_hours) VALUES('S212','다인',2) RETURNING student_id,study_hours;
+-- 결과 확인: SELECT student_id,study_hours FROM study_students WHERE student_id='S212';
+
+-- H5 | INSERT→UPDATE→DELETE 결합 | 기대 오류: 없음
+INSERT INTO study_students(student_id,student_name,study_hours) VALUES ('S213','지민',2); UPDATE study_students SET study_hours=study_hours+3 WHERE student_id='S213'; DELETE FROM study_students WHERE student_id='S104';
+-- 결과 확인: SELECT student_id,study_hours FROM study_students ORDER BY student_id;
+e:[["children",{"s":"__PAGE__","h":160,"d":{"r":["$","$1","c",{"children":[["$","$L11",null,{"setup":"$12","cases":"$13"}],["$L14","$L15","$L16"],"$L17"]}],"p":"$@18","v":null,"s":"$6"}}]]
+c:[["children",{"s":"dml","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@d","v":"$9","s":"$6"},"c":"$Qe"}]]
+a:[["children",{"s":"learn","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@b","v":"$9","s":"$6"},"c":"$Qc"}]]
+7:[["children",{"s":"sqld","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@8","v":"$9","s":"$6"},"c":"$Qa"}]]
+0:{"t":{"t":{"s":"","h":80,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}],"notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]]}]}]}]]}],"p":"$@5","v":null,"s":"$6"},"c":"$Q7"},"h":{"r":["$","$1","h",{"children":[null,["$","$L1a",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","$L1c",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$1d",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"DML 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":"$@1e","v":null,"s":"$6"}},"a":"$@1f","u":"$@20","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+21:I[97367,["$2"],"OutletBoundary"]
+:HL["/study-note-preview/_next/static/chunks/3y_5azcx_l1yz.css","style"]
+14:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/3y_5azcx_l1yz.css","precedence":"next"}]
+15:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/1ifood9jrl2ng.js","async":true}]
+16:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true}]
+17:["$","$L21",null,{"children":["$","$1d",null,{"name":"Next.MetadataOutlet","children":"$@22"}]}]
+6:300
+22:null
+20:true
+6:C
+1f:0
+d:"$undefined"
+b:"$undefined"
+8:"$undefined"
+5:"$undefined"
+1e:"$undefined"
+18:"$undefined"

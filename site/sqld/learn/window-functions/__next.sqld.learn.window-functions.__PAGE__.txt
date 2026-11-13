@@ -1,0 +1,263 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+f:"/study-note-preview/_next/static/chunks/21rnqlt94y00x.js"
+10:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+11:"/study-note-preview/_next/static/chunks/1q_q1ckigozuj.js"
+12:"WindowFunctionsPage"
+13:I[81931,["$2","$f","$10","$11"],"$12"]
+1b:"ViewportBoundary"
+1c:I[97367,["$2"],"$1b"]
+1d:"MetadataBoundary"
+1e:I[97367,["$2"],"$1d"]
+1f:"$Sreact.suspense"
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+6:X
+9:X
+9:C
+14:T250b,-- 06W 독립 실습 테이블: 06V 원본 판매 5건(1~5)을 유지하고 6~8을 추가해 동률과 윈도우를 학습한다.
+-- 06V 수령 원본/콘텐츠/기대값은 변경하지 않는다.
+CREATE TABLE sales (
+    sale_id INTEGER PRIMARY KEY,
+    region TEXT,
+    category TEXT NOT NULL,
+    amount INTEGER NOT NULL CHECK (amount >= 0),
+    sale_day INTEGER NOT NULL
+);
+INSERT INTO sales (sale_id,region,category,amount,sale_day) VALUES
+    (1,'서울','책',100,1),
+    (2,'서울','문구',50,2),
+    (3,'부산','책',80,1),
+    (4,'부산','문구',20,2),
+    (5,NULL,'책',30,1),
+    (6,'서울','책',80,3),
+    (7,'부산','책',80,3),
+    (8,'서울','문구',50,4);
+-- 전체 8행, 490. 서울 4행/280, 부산 3행/180, 지역 실제 NULL 1행/30.
+-- 책 370(100+80+30+80+80), 문구 120(50+20+50).
+-- 윈도우 ORDER BY는 결과표 정렬을 보장하지 않는다. 모든 조회에 최종 ORDER BY를 둔다.
+
+
+-- A1: 원본 8건의 순서와 실제 NULL
+SELECT sale_id,region,category,amount,sale_day FROM sales ORDER BY sale_id;
+
+-- A2: GROUP BY: 세 지역 집계는 3행
+SELECT region,COUNT(*) AS n,SUM(amount) AS total FROM sales
+GROUP BY region ORDER BY region IS NULL,region;
+
+-- A3: 윈도우 SUM: 원본 8행 유지
+SELECT sale_id,region,amount,SUM(amount) OVER(PARTITION BY region) AS region_total
+FROM sales ORDER BY sale_id;
+
+-- A4: OVER (): 전 데이터 합계 490
+SELECT sale_id,amount,SUM(amount) OVER() AS all_total FROM sales ORDER BY sale_id;
+
+-- A5: WHERE가 먼저 행을 줄이면 창도 달라짐
+SELECT sale_id,region,amount,SUM(amount) OVER(PARTITION BY region) AS visible_region_total
+FROM sales WHERE amount>=50 ORDER BY sale_id;
+
+-- B1: 지역별 파티션 행 수
+SELECT sale_id,region,COUNT(*) OVER(PARTITION BY region) AS part_count
+FROM sales ORDER BY sale_id;
+
+-- B2: 파티션별 sale_id 순서에서 1부터 번호
+SELECT sale_id,region,ROW_NUMBER() OVER(PARTITION BY region ORDER BY sale_id) AS part_pos
+FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- B3: 바깥 정렬을 뒤집어도 내부 번호는 그대로
+SELECT sale_id,region,ROW_NUMBER() OVER(PARTITION BY region ORDER BY sale_id) AS part_pos
+FROM sales ORDER BY sale_id DESC;
+
+-- B4: PARTITION 없이 전체 8행 번호
+SELECT sale_id,ROW_NUMBER() OVER(ORDER BY sale_id) AS global_pos
+FROM sales ORDER BY sale_id;
+
+-- B5: 품목으로 파티션을 바꾸면 다른 합계
+SELECT sale_id,category,amount,SUM(amount) OVER(PARTITION BY category) AS category_total
+FROM sales ORDER BY sale_id;
+
+-- C1: ROW_NUMBER: 동률도 서로 다른 번호
+SELECT sale_id,amount,ROW_NUMBER() OVER(ORDER BY amount DESC,sale_id) AS row_no
+FROM sales ORDER BY amount DESC,sale_id;
+
+-- C2: RANK: 공동 2등 뒤는 5등
+SELECT sale_id,amount,RANK() OVER(ORDER BY amount DESC) AS sale_rank
+FROM sales ORDER BY amount DESC,sale_id;
+
+-- C3: DENSE_RANK: 공동 2등 뒤는 3등
+SELECT sale_id,amount,DENSE_RANK() OVER(ORDER BY amount DESC) AS dense_rank_no
+FROM sales ORDER BY amount DESC,sale_id;
+
+-- C4: 세 함수의 동률 비교
+SELECT sale_id,amount,
+ROW_NUMBER() OVER(ORDER BY amount DESC,sale_id) AS row_no,
+RANK() OVER(ORDER BY amount DESC) AS rank_no,
+DENSE_RANK() OVER(ORDER BY amount DESC) AS dense_no
+FROM sales ORDER BY amount DESC,sale_id;
+
+-- C5: 지역 안에서 별도의 공동 순위
+SELECT sale_id,region,amount,RANK() OVER(PARTITION BY region ORDER BY amount DESC) AS local_rank
+FROM sales ORDER BY region IS NULL,region,amount DESC,sale_id;
+
+-- D1: 모든 지역 행에 지역 합계 붙이기
+SELECT sale_id,region,amount,SUM(amount) OVER(PARTITION BY region) AS part_total
+FROM sales ORDER BY sale_id;
+
+-- D2: sale_id 순서 누적합
+SELECT sale_id,region,amount,SUM(amount) OVER(
+PARTITION BY region ORDER BY sale_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+) AS running_total FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- D3: 최근 3행(현재 포함) 이동합
+SELECT sale_id,region,amount,SUM(amount) OVER(
+PARTITION BY region ORDER BY sale_id ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+) AS last_three_sum FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- D4: AVG도 각 원본행을 유지
+SELECT sale_id,region,amount,AVG(amount) OVER(PARTITION BY region) AS region_avg
+FROM sales ORDER BY sale_id;
+
+-- D5: COUNT·SUM을 함께 계산
+SELECT sale_id,region,COUNT(*) OVER(PARTITION BY region) AS part_n,
+SUM(amount) OVER(PARTITION BY region) AS part_sum
+FROM sales ORDER BY sale_id;
+
+-- E1: ROWS: 동률도 한 행씩 누적
+SELECT sale_id,region,amount,SUM(amount) OVER(
+PARTITION BY region ORDER BY amount,sale_id
+ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS row_running
+FROM sales ORDER BY region IS NULL,region,amount,sale_id;
+
+-- E2: RANGE: 같은 amount는 같은 누적
+SELECT sale_id,region,amount,SUM(amount) OVER(
+PARTITION BY region ORDER BY amount
+RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS range_running
+FROM sales ORDER BY region IS NULL,region,amount,sale_id;
+
+-- E3: ROWS와 RANGE 같은 행 비교
+SELECT sale_id,region,amount,
+SUM(amount) OVER(PARTITION BY region ORDER BY amount,sale_id
+ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS rows_sum,
+SUM(amount) OVER(PARTITION BY region ORDER BY amount
+RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS range_sum
+FROM sales ORDER BY region IS NULL,region,amount,sale_id;
+
+-- E4: RANGE 10 PRECEDING은 금액 차이 10
+SELECT sale_id,region,amount,SUM(amount) OVER(
+PARTITION BY region ORDER BY amount
+RANGE BETWEEN 10 PRECEDING AND CURRENT ROW) AS band_sum
+FROM sales ORDER BY region IS NULL,region,amount,sale_id;
+
+-- E5: RANGE CURRENT ROW의 동률 행 수
+SELECT sale_id,region,amount,COUNT(*) OVER(
+PARTITION BY region ORDER BY amount
+RANGE BETWEEN CURRENT ROW AND CURRENT ROW) AS peer_count
+FROM sales ORDER BY region IS NULL,region,amount,sale_id;
+
+-- F1: 기본 LAST_VALUE는 현재 행일 수 있음
+SELECT sale_id,region,
+FIRST_VALUE(sale_id) OVER(PARTITION BY region ORDER BY sale_id) AS first_id,
+LAST_VALUE(sale_id) OVER(PARTITION BY region ORDER BY sale_id) AS default_last_id
+FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- F2: UNBOUNDED FOLLOWING으로 파티션 마지막
+SELECT sale_id,region,
+LAST_VALUE(sale_id) OVER(PARTITION BY region ORDER BY sale_id
+ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS full_last_id
+FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- F3: 현재부터 파티션 끝까지 미래 합계
+SELECT sale_id,region,amount,SUM(amount) OVER(
+PARTITION BY region ORDER BY sale_id
+ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS future_sum
+FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- F4: 전체 프레임과 ORDER BY 없는 전체 파티션
+SELECT sale_id,region,
+SUM(amount) OVER(PARTITION BY region) AS no_order_total,
+SUM(amount) OVER(PARTITION BY region ORDER BY sale_id
+ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS full_frame_total
+FROM sales ORDER BY sale_id;
+
+-- F5: 양쪽 한 행씩 포함하는 3행 창
+SELECT sale_id,region,amount,SUM(amount) OVER(
+PARTITION BY region ORDER BY sale_id
+ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS neighbor_sum
+FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- G1: LAG: 같은 지역의 직전 행 금액
+SELECT sale_id,region,amount,LAG(amount) OVER(PARTITION BY region ORDER BY sale_id) AS prev_amount
+FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- G2: LEAD: 같은 지역의 다음 행 금액
+SELECT sale_id,region,amount,LEAD(amount) OVER(PARTITION BY region ORDER BY sale_id) AS next_amount
+FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- G3: LAG(2, -1): 두 행 전이 없으면 -1
+SELECT sale_id,region,amount,
+LAG(amount,2,-1) OVER(PARTITION BY region ORDER BY sale_id) AS prev_two_or_minus1
+FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- G4: FIRST_VALUE와 LAST_VALUE 기본/전체 비교
+SELECT sale_id,region,
+FIRST_VALUE(amount) OVER(PARTITION BY region ORDER BY sale_id) AS first_amount,
+LAST_VALUE(amount) OVER(PARTITION BY region ORDER BY sale_id) AS default_last_amount,
+LAST_VALUE(amount) OVER(PARTITION BY region ORDER BY sale_id
+ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS full_last_amount
+FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- G5: 전후 값 비교와 경계
+SELECT sale_id,region,amount,
+LAG(amount) OVER(PARTITION BY region ORDER BY sale_id) AS prev,
+LEAD(amount) OVER(PARTITION BY region ORDER BY sale_id) AS next
+FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- H1: NTILE(3): 8행을 3·3·2로
+SELECT sale_id,amount,NTILE(3) OVER(ORDER BY amount DESC,sale_id) AS tile3
+FROM sales ORDER BY amount DESC,sale_id;
+
+-- H2: PERCENT_RANK: (RANK-1)/(N-1)
+SELECT sale_id,amount,RANK() OVER(ORDER BY amount DESC) AS rank_no,
+PERCENT_RANK() OVER(ORDER BY amount DESC) AS pct_rank
+FROM sales ORDER BY amount DESC,sale_id;
+
+-- H3: CUME_DIST: 해당 값 이상(내림차순) 누적 비율
+SELECT sale_id,amount,CUME_DIST() OVER(ORDER BY amount DESC) AS cume
+FROM sales ORDER BY amount DESC,sale_id;
+
+-- H4: PERCENT_RANK와 CUME_DIST를 나란히
+SELECT sale_id,amount,
+RANK() OVER(ORDER BY amount DESC) AS rank_no,
+PERCENT_RANK() OVER(ORDER BY amount DESC) AS pct_rank,
+CUME_DIST() OVER(ORDER BY amount DESC) AS cume
+FROM sales ORDER BY amount DESC,sale_id;
+
+-- H5: 지역별 NTILE(3)와 행 수
+SELECT sale_id,region,amount,
+COUNT(*) OVER(PARTITION BY region) AS part_n,
+NTILE(3) OVER(PARTITION BY region ORDER BY amount DESC,sale_id) AS tile_in_region
+FROM sales ORDER BY region IS NULL,region,amount DESC,sale_id;
+e:[["children",{"s":"__PAGE__","h":160,"d":{"r":["$","$1","c",{"children":[["$","$L13",null,{"fullSql":"$14"}],["$L15","$L16","$L17","$L18"],"$L19"]}],"p":"$@1a","v":null,"s":"$6"}}]]
+c:[["children",{"s":"window-functions","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@d","v":"$9","s":"$6"},"c":"$Qe"}]]
+a:[["children",{"s":"learn","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@b","v":"$9","s":"$6"},"c":"$Qc"}]]
+7:[["children",{"s":"sqld","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@8","v":"$9","s":"$6"},"c":"$Qa"}]]
+0:{"t":{"t":{"s":"","h":80,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}],"notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]]}]}]}]]}],"p":"$@5","v":null,"s":"$6"},"c":"$Q7"},"h":{"r":["$","$1","h",{"children":[null,["$","$L1c",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","$L1e",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$1f",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"윈도우 함수 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":"$@20","v":null,"s":"$6"}},"a":"$@21","u":"$@22","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+23:I[97367,["$2"],"OutletBoundary"]
+:HL["/study-note-preview/_next/static/chunks/16zddi6wcj7_9.css","style"]
+15:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/16zddi6wcj7_9.css","precedence":"next"}]
+16:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/21rnqlt94y00x.js","async":true}]
+17:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true}]
+18:["$","script","script-2",{"src":"/study-note-preview/_next/static/chunks/1q_q1ckigozuj.js","async":true}]
+19:["$","$L23",null,{"children":["$","$1f",null,{"name":"Next.MetadataOutlet","children":"$@24"}]}]
+6:300
+24:null
+22:true
+6:C
+21:0
+d:"$undefined"
+b:"$undefined"
+8:"$undefined"
+5:"$undefined"
+20:"$undefined"
+1a:"$undefined"

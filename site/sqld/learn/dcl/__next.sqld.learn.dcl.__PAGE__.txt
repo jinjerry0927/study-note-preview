@@ -1,0 +1,78 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+f:"/study-note-preview/_next/static/chunks/21rnqlt94y00x.js"
+10:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+11:"/study-note-preview/_next/static/chunks/3h0lexe4bhjye.js"
+12:I[8081,["$2","$f","$10","$11"],"DclPage"]
+1a:"ViewportBoundary"
+1b:I[97367,["$2"],"$1a"]
+1c:"MetadataBoundary"
+1d:I[97367,["$2"],"$1c"]
+1e:"$Sreact.suspense"
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+6:X
+9:X
+9:C
+13:Tb0b,-- STUDY.note DCL 권한 *교육용 이력 시뮬레이션*. 아래 메타테이블은 실제 SQLite 권한을 강제하지 않습니다.
+-- SQLite에는 GRANT/REVOKE/CREATE ROLE 문법이 없습니다. 이는 Oracle/PG 권한 엔진 대체물이 아닙니다.
+CREATE TABLE persons (principal TEXT PRIMARY KEY, description TEXT NOT NULL);
+INSERT INTO persons VALUES ('owner','점수표 소유자'),('alice','조회 담당'),('bob','입력 담당'),('carol','조회 실습생'),('dave','팀원'),('eve','외부 실습생');
+CREATE TABLE objects(object_name TEXT PRIMARY KEY, owner TEXT NOT NULL);
+INSERT INTO objects VALUES ('exam_scores','owner'),('attendance','owner'),('notes','owner');
+CREATE TABLE grants_direct (
+ grantor TEXT NOT NULL, grantee TEXT NOT NULL, object_name TEXT NOT NULL,
+ privilege TEXT NOT NULL CHECK(privilege IN ('SELECT','INSERT','UPDATE','DELETE')),
+ grant_option INTEGER NOT NULL DEFAULT 0 CHECK(grant_option IN(0,1)),
+ PRIMARY KEY(grantor, grantee, object_name, privilege)
+);
+INSERT INTO grants_direct VALUES ('owner','alice','exam_scores','SELECT',0),
+ ('owner','bob','exam_scores','INSERT',0),('owner','carol','attendance','SELECT',0),
+ ('owner','dave','notes','UPDATE',0);
+CREATE TABLE role_grants (role_name TEXT NOT NULL,object_name TEXT NOT NULL,privilege TEXT NOT NULL,
+ PRIMARY KEY(role_name,object_name,privilege));
+INSERT INTO role_grants VALUES ('reader','exam_scores','SELECT'),('reader','attendance','SELECT'),
+ ('editor','exam_scores','UPDATE'),('editor','exam_scores','SELECT');
+CREATE TABLE role_members (principal TEXT NOT NULL, role_name TEXT NOT NULL,admin_option INTEGER NOT NULL DEFAULT 0,
+ PRIMARY KEY(principal,role_name));
+INSERT INTO role_members VALUES ('bob','reader',0),('carol','editor',0),('eve','reader',0);
+CREATE TABLE public_grants (object_name TEXT NOT NULL,privilege TEXT NOT NULL,
+ PRIMARY KEY(object_name,privilege));
+INSERT INTO public_grants VALUES ('notes','SELECT');
+CREATE TABLE system_grants (principal TEXT NOT NULL,privilege TEXT NOT NULL,admin_option INTEGER NOT NULL DEFAULT 0,
+ PRIMARY KEY(principal,privilege));
+INSERT INTO system_grants VALUES ('alice','CREATE TABLE',0);
+CREATE VIEW effective_access AS
+ SELECT grantee principal,object_name,privilege,'DIRECT' source FROM grants_direct
+ UNION ALL SELECT m.principal,r.object_name,r.privilege,'ROLE:'||r.role_name
+   FROM role_members m JOIN role_grants r ON r.role_name=m.role_name
+ UNION ALL SELECT p.principal,g.object_name,g.privilege,'PUBLIC'
+   FROM persons p CROSS JOIN public_grants g
+ UNION ALL SELECT owner principal,object_name,'SELECT','OWNER' FROM objects
+ UNION ALL SELECT owner principal,object_name,'INSERT','OWNER' FROM objects
+ UNION ALL SELECT owner principal,object_name,'UPDATE','OWNER' FROM objects
+ UNION ALL SELECT owner principal,object_name,'DELETE','OWNER' FROM objects;
+e:[["children",{"s":"__PAGE__","h":160,"d":{"r":["$","$1","c",{"children":[["$","$L12",null,{"setup":"$13"}],["$L14","$L15","$L16","$L17"],"$L18"]}],"p":"$@19","v":null,"s":"$6"}}]]
+c:[["children",{"s":"dcl","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@d","v":"$9","s":"$6"},"c":"$Qe"}]]
+a:[["children",{"s":"learn","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@b","v":"$9","s":"$6"},"c":"$Qc"}]]
+7:[["children",{"s":"sqld","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@8","v":"$9","s":"$6"},"c":"$Qa"}]]
+0:{"t":{"t":{"s":"","h":80,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}],"notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]]}]}]}]]}],"p":"$@5","v":null,"s":"$6"},"c":"$Q7"},"h":{"r":["$","$1","h",{"children":[null,["$","$L1b",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","$L1d",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$1e",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"DCL 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":"$@1f","v":null,"s":"$6"}},"a":"$@20","u":"$@21","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+22:I[97367,["$2"],"OutletBoundary"]
+:HL["/study-note-preview/_next/static/chunks/2i0skhevbi77u.css","style"]
+14:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/2i0skhevbi77u.css","precedence":"next"}]
+15:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/21rnqlt94y00x.js","async":true}]
+16:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true}]
+17:["$","script","script-2",{"src":"/study-note-preview/_next/static/chunks/3h0lexe4bhjye.js","async":true}]
+18:["$","$L22",null,{"children":["$","$1e",null,{"name":"Next.MetadataOutlet","children":"$@23"}]}]
+6:300
+23:null
+21:true
+6:C
+20:0
+d:"$undefined"
+b:"$undefined"
+8:"$undefined"
+5:"$undefined"
+1f:"$undefined"
+19:"$undefined"

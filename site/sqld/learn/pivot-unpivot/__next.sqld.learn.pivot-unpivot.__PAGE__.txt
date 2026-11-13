@@ -1,0 +1,204 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+f:"/study-note-preview/_next/static/chunks/0hkg0uqb4ug_s.js"
+10:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+11:I[79179,["$2","$f","$10"],"PivotPage"]
+18:"ViewportBoundary"
+19:I[97367,["$2"],"$18"]
+1a:"MetadataBoundary"
+1b:I[97367,["$2"],"$1a"]
+1c:"$Sreact.suspense"
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+6:X
+9:X
+9:C
+12:T26a8,-- SQLD sqld-detail-025: original educational fixture; execute in an empty SQLite database.
+-- Q1~Q3 are target pivot columns; Q4 is intentionally outside that set.
+DROP TABLE IF EXISTS sales_long;
+DROP TABLE IF EXISTS sales_wide;
+CREATE TABLE sales_long (
+    sale_id TEXT PRIMARY KEY,
+    region TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    quarter TEXT NOT NULL,
+    amount INTEGER
+);
+INSERT INTO sales_long(sale_id, region, channel, quarter, amount) VALUES
+('R01','서울','온라인','Q1',100),
+('R02','서울','매장','Q1',50),
+('R03','서울','온라인','Q2',80),
+('R04','서울','온라인','Q3',NULL),
+('R05','부산','온라인','Q1',70),
+('R06','부산','매장','Q2',0),
+('R07','부산','온라인','Q3',30),
+('R08','대전','온라인','Q1',40),
+('R09','대전','매장','Q3',20),
+('R10','서울','매장','Q4',10),
+('R11','부산','매장','Q1',20);
+-- Wide data is a deliberately aggregated Q1~Q3 view, not a row-level original copy.
+CREATE TABLE sales_wide AS
+SELECT region,
+       SUM(CASE WHEN quarter='Q1' THEN amount END) AS q1,
+       SUM(CASE WHEN quarter='Q2' THEN amount END) AS q2,
+       SUM(CASE WHEN quarter='Q3' THEN amount END) AS q3
+FROM sales_long
+GROUP BY region;
+
+-- [A1] 원본 Long 11개 판매 기록
+SELECT sale_id, region, channel, quarter, amount FROM sales_long ORDER BY sale_id;
+
+-- [A2] 분기별 판매 원본 행 수
+SELECT quarter, COUNT(*) AS fact_rows FROM sales_long GROUP BY quarter ORDER BY quarter;
+
+-- [A3] 지역×분기 집계 원본
+SELECT region, quarter, SUM(amount) AS total_amount, COUNT(*) AS fact_rows FROM sales_long GROUP BY region, quarter ORDER BY region, quarter;
+
+-- [A4] 완성된 Wide 자료 3행
+SELECT region, q1, q2, q3 FROM sales_wide ORDER BY region;
+
+-- [A5] 열별 자료가 있는 지역 수
+SELECT COUNT(*) AS regions, COUNT(q1) AS q1_nonnull, COUNT(q2) AS q2_nonnull, COUNT(q3) AS q3_nonnull FROM sales_wide;
+
+-- [B1] PIVOT의 SUM에 대응하는 조건부 집계
+SELECT region, SUM(CASE WHEN quarter='Q1' THEN amount END) AS q1, SUM(CASE WHEN quarter='Q2' THEN amount END) AS q2, SUM(CASE WHEN quarter='Q3' THEN amount END) AS q3 FROM sales_long GROUP BY region ORDER BY region;
+
+-- [B2] SUM 대신 행 건수 COUNT
+SELECT region, COUNT(CASE WHEN quarter='Q1' THEN 1 END) AS q1_rows, COUNT(CASE WHEN quarter='Q2' THEN 1 END) AS q2_rows, COUNT(CASE WHEN quarter='Q3' THEN 1 END) AS q3_rows FROM sales_long GROUP BY region ORDER BY region;
+
+-- [B3] PIVOT AVG에 대응하는 조건부 평균
+SELECT region, AVG(CASE WHEN quarter='Q1' THEN amount END) AS q1_avg, AVG(CASE WHEN quarter='Q2' THEN amount END) AS q2_avg, AVG(CASE WHEN quarter='Q3' THEN amount END) AS q3_avg FROM sales_long GROUP BY region ORDER BY region;
+
+-- [B4] PIVOT MAX와 SUM 비교
+SELECT region, MAX(CASE WHEN quarter='Q1' THEN amount END) AS q1_max, SUM(CASE WHEN quarter='Q1' THEN amount END) AS q1_sum FROM sales_long GROUP BY region ORDER BY region;
+
+-- [B5] PIVOT IN 목록에 Q4까지 포함
+SELECT region, SUM(CASE WHEN quarter='Q1' THEN amount END) AS q1, SUM(CASE WHEN quarter='Q2' THEN amount END) AS q2, SUM(CASE WHEN quarter='Q3' THEN amount END) AS q3, SUM(CASE WHEN quarter='Q4' THEN amount END) AS q4 FROM sales_long GROUP BY region ORDER BY region;
+
+-- [C1] 추가 채널 컬럼 때문에 6개 그룹
+SELECT region, channel, SUM(CASE WHEN quarter='Q1' THEN amount END) AS q1, SUM(CASE WHEN quarter='Q2' THEN amount END) AS q2, SUM(CASE WHEN quarter='Q3' THEN amount END) AS q3 FROM sales_long GROUP BY region, channel ORDER BY region, channel;
+
+-- [C2] 지역만 남긴 명시적 투영은 3개 그룹
+SELECT region, SUM(CASE WHEN quarter='Q1' THEN amount END) AS q1, SUM(CASE WHEN quarter='Q2' THEN amount END) AS q2, SUM(CASE WHEN quarter='Q3' THEN amount END) AS q3 FROM (SELECT region, quarter, amount FROM sales_long) s GROUP BY region ORDER BY region;
+
+-- [C3] 지역별 채널 수
+SELECT region, COUNT(DISTINCT channel) AS channel_groups FROM sales_long GROUP BY region ORDER BY region;
+
+-- [C4] 서울만 채널별 PIVOT
+SELECT region, channel, SUM(CASE WHEN quarter='Q1' THEN amount END) AS q1, SUM(CASE WHEN quarter='Q2' THEN amount END) AS q2 FROM sales_long WHERE region='서울' GROUP BY region, channel ORDER BY channel;
+
+-- [C5] 채널별 소계를 다시 합치면 지역별 결과
+WITH by_channel AS (SELECT region,channel,SUM(CASE WHEN quarter='Q1' THEN amount END) AS q1, SUM(CASE WHEN quarter='Q2' THEN amount END) AS q2 FROM sales_long GROUP BY region, channel) SELECT region,SUM(q1) AS q1,SUM(q2) AS q2 FROM by_channel GROUP BY region ORDER BY region;
+
+-- [D1] UNPIVOT 입력 Wide의 9개 칸
+SELECT region, q1, q2, q3 FROM sales_wide ORDER BY region;
+
+-- [D2] UNPIVOT EXCLUDE NULLS 대응 7행
+SELECT region,quarter,amount FROM (SELECT region,'Q1' AS quarter,q1 AS amount FROM sales_wide
+UNION ALL SELECT region,'Q2',q2 FROM sales_wide
+UNION ALL SELECT region,'Q3',q3 FROM sales_wide) x WHERE amount IS NOT NULL ORDER BY region,quarter;
+
+-- [D3] UNPIVOT INCLUDE NULLS 대응 9행
+SELECT region,quarter,amount FROM (SELECT region,'Q1' AS quarter,q1 AS amount FROM sales_wide
+UNION ALL SELECT region,'Q2',q2 FROM sales_wide
+UNION ALL SELECT region,'Q3',q3 FROM sales_wide) x ORDER BY region,quarter;
+
+-- [D4] Q1·Q2 두 열만 펼치기
+SELECT region,quarter,amount FROM (SELECT region,'Q1' AS quarter,q1 AS amount FROM sales_wide UNION ALL SELECT region,'Q2',q2 FROM sales_wide) x WHERE amount IS NOT NULL ORDER BY region,quarter;
+
+-- [D5] 펼친 후 지역별 행 개수
+SELECT region,COUNT(*) AS visible_rows FROM (SELECT region,'Q1' AS quarter,q1 AS amount FROM sales_wide
+UNION ALL SELECT region,'Q2',q2 FROM sales_wide
+UNION ALL SELECT region,'Q3',q3 FROM sales_wide) x WHERE amount IS NOT NULL GROUP BY region ORDER BY region;
+
+-- [E1] Q2: 입력이 없음과 실제 0의 구별
+SELECT w.region,w.q2,COUNT(l.sale_id) AS q2_source_rows,COUNT(l.amount) AS q2_nonnull_amounts FROM sales_wide w LEFT JOIN sales_long l ON w.region=l.region AND l.quarter='Q2' GROUP BY w.region,w.q2 ORDER BY w.region;
+
+-- [E2] Q3: 실제 NULL 값의 존재
+SELECT region,COUNT(CASE WHEN quarter='Q3' THEN 1 END) AS q3_source_rows,COUNT(CASE WHEN quarter='Q3' THEN amount END) AS q3_nonnull_values,SUM(CASE WHEN quarter='Q3' THEN amount END) AS q3_sum FROM sales_long GROUP BY region ORDER BY region;
+
+-- [E3] ELSE 0을 쓰면 빈 칸이 0으로 바뀜
+SELECT region,SUM(CASE WHEN quarter='Q2' THEN amount END) AS preserve_null,SUM(CASE WHEN quarter='Q2' THEN amount ELSE 0 END) AS missing_as_zero FROM sales_long GROUP BY region ORDER BY region;
+
+-- [E4] COALESCE로 표시에만 0 적용
+SELECT region,q2,COALESCE(q2,0) AS display_q2 FROM sales_wide ORDER BY region;
+
+-- [E5] UNPIVOT에서 NULL을 남기는 수 검증
+SELECT COUNT(*) AS include_rows,COUNT(amount) AS exclude_rows,SUM(CASE WHEN amount IS NULL THEN 1 ELSE 0 END) AS null_cells FROM (SELECT region,'Q1' AS quarter,q1 AS amount FROM sales_wide
+UNION ALL SELECT region,'Q2',q2 FROM sales_wide
+UNION ALL SELECT region,'Q3',q3 FROM sales_wide) x;
+
+-- [F1] 원본 Q1 판매 행 5개
+SELECT sale_id,region,quarter,amount FROM sales_long WHERE quarter='Q1' ORDER BY sale_id;
+
+-- [F2] PIVOT 집계 뒤 Q1은 3행
+SELECT region,SUM(amount) AS q1_total FROM sales_long WHERE quarter='Q1' GROUP BY region ORDER BY region;
+
+-- [F3] Q1~Q3 PIVOT 뒤 3행
+SELECT region,q1,q2,q3 FROM sales_wide ORDER BY region;
+
+-- [F4] 피벗 후 다시 펼쳐도 7행만 남음
+SELECT region,quarter,amount FROM (SELECT region,'Q1' AS quarter,q1 AS amount FROM sales_wide
+UNION ALL SELECT region,'Q2',q2 FROM sales_wide
+UNION ALL SELECT region,'Q3',q3 FROM sales_wide) x WHERE amount IS NOT NULL ORDER BY region,quarter;
+
+-- [F5] 원본/변환 행 수 비교
+SELECT (SELECT COUNT(*) FROM sales_long) AS raw_all_rows,(SELECT COUNT(*) FROM sales_long WHERE quarter IN ('Q1','Q2','Q3') AND amount IS NOT NULL) AS raw_included_nonnull_rows,(SELECT COUNT(*) FROM (SELECT region,'Q1' AS quarter,q1 AS amount FROM sales_wide
+UNION ALL SELECT region,'Q2',q2 FROM sales_wide
+UNION ALL SELECT region,'Q3',q3 FROM sales_wide) u WHERE amount IS NOT NULL) AS repivot_unpivot_rows;
+
+-- [G1] PIVOT 결과의 표시 순서 명시
+SELECT region,q1,q2,q3 FROM sales_wide ORDER BY region DESC;
+
+-- [G2] 열 이름을 설명적인 별칭으로 변경
+SELECT region,q1 AS q1_sales,q2 AS q2_sales,q3 AS q3_sales FROM sales_wide ORDER BY region;
+
+-- [G3] 두 지역만 조회
+SELECT region,q1,q2,q3 FROM sales_wide WHERE region IN ('서울','부산') ORDER BY region;
+
+-- [G4] Q2·Q3 두 피벗 열만 선택
+SELECT region,q2,q3 FROM sales_wide ORDER BY region;
+
+-- [G5] 존재하지 않는 Q5도 고정 열로 표시 가능
+SELECT region, SUM(CASE WHEN quarter='Q5' THEN amount END) AS q5 FROM sales_long GROUP BY region ORDER BY region;
+
+-- [H1] 사전 필터: 온라인 채널만 피벗
+SELECT region,SUM(CASE WHEN quarter='Q1' THEN amount END) AS q1,SUM(CASE WHEN quarter='Q2' THEN amount END) AS q2,SUM(CASE WHEN quarter='Q3' THEN amount END) AS q3 FROM sales_long WHERE channel='온라인' GROUP BY region ORDER BY region;
+
+-- [H2] 사후 필터: 집계된 Q1이 100 이상
+SELECT region,q1,q2,q3 FROM sales_wide WHERE q1>=100 ORDER BY region;
+
+-- [H3] COUNT(값)과 COUNT(*) 차이 검증
+SELECT quarter,COUNT(*) AS source_rows,COUNT(amount) AS measured_rows,SUM(amount) AS total_amount FROM sales_long GROUP BY quarter ORDER BY quarter;
+
+-- [H4] 전체 합계: Q4 제외 410·포함 420
+SELECT SUM(amount) AS all_quarters, SUM(CASE WHEN quarter IN ('Q1','Q2','Q3') THEN amount END) AS pivot_quarters, SUM(CASE WHEN quarter='Q4' THEN amount END) AS excluded_q4 FROM sales_long;
+
+-- [H5] UNPIVOT 뒤 합계는 Q1~Q3 집계와 일치
+SELECT region,SUM(amount) AS included_total FROM (SELECT region,'Q1' AS quarter,q1 AS amount FROM sales_wide
+UNION ALL SELECT region,'Q2',q2 FROM sales_wide
+UNION ALL SELECT region,'Q3',q3 FROM sales_wide) x WHERE amount IS NOT NULL GROUP BY region ORDER BY region;
+
+e:[["children",{"s":"__PAGE__","h":160,"d":{"r":["$","$1","c",{"children":[["$","$L11",null,{"fullSql":"$12"}],["$L13","$L14","$L15"],"$L16"]}],"p":"$@17","v":null,"s":"$6"}}]]
+c:[["children",{"s":"pivot-unpivot","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@d","v":"$9","s":"$6"},"c":"$Qe"}]]
+a:[["children",{"s":"learn","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@b","v":"$9","s":"$6"},"c":"$Qc"}]]
+7:[["children",{"s":"sqld","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@8","v":"$9","s":"$6"},"c":"$Qa"}]]
+0:{"t":{"t":{"s":"","h":80,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}],"notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]]}]}]}]]}],"p":"$@5","v":null,"s":"$6"},"c":"$Q7"},"h":{"r":["$","$1","h",{"children":[null,["$","$L19",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","$L1b",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$1c",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"PIVOT 절과 UNPIVOT 절 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":"$@1d","v":null,"s":"$6"}},"a":"$@1e","u":"$@1f","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+20:I[97367,["$2"],"OutletBoundary"]
+:HL["/study-note-preview/_next/static/chunks/0h4332b55nxmx.css","style"]
+13:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0h4332b55nxmx.css","precedence":"next"}]
+14:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/0hkg0uqb4ug_s.js","async":true}]
+15:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true}]
+16:["$","$L20",null,{"children":["$","$1c",null,{"name":"Next.MetadataOutlet","children":"$@21"}]}]
+6:300
+21:null
+1f:true
+6:C
+1e:0
+d:"$undefined"
+b:"$undefined"
+8:"$undefined"
+5:"$undefined"
+1d:"$undefined"
+17:"$undefined"

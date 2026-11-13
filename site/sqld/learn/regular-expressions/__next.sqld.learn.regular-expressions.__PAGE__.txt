@@ -1,0 +1,160 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+f:"/study-note-preview/_next/static/chunks/0uph653vf10jg.js"
+10:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+11:I[99270,["$2","$f","$10"],"RegexPage"]
+18:"ViewportBoundary"
+19:I[97367,["$2"],"$18"]
+1a:"MetadataBoundary"
+1b:I[97367,["$2"],"$1a"]
+1c:"$Sreact.suspense"
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+6:X
+9:X
+9:C
+12:T1611,-- Python sqlite3에서 verify_06aa_package.py 실행 시 아래 40 SQL을 검증합니다.
+-- .sql 단독 sqlite3 CLI 실행으로는 rx_* 또는 REGEXP가 작동하지 않습니다.
+
+-- A1: LIKE 부분 포함
+SELECT sample_id, raw_text FROM study_codes WHERE raw_text LIKE '%AB%' ORDER BY sample_id;
+
+-- A2: GLOB 와일드카드
+SELECT sample_id, raw_text FROM study_codes WHERE raw_text GLOB 'S10?-*' ORDER BY sample_id;
+
+-- A3: 사용자 함수로 패턴 검사
+SELECT sample_id, raw_text FROM study_codes WHERE rx_like(raw_text, '^S10[0-9]-') = 1 ORDER BY sample_id;
+
+-- A4: SQLite REGEXP 연산자
+SELECT sample_id, raw_text FROM study_codes WHERE raw_text REGEXP '^S10[0-9]-' ORDER BY sample_id;
+
+-- A5: NULL 매치 결과
+SELECT sample_id, rx_like(raw_text, 'AB') AS matched FROM study_codes WHERE sample_id IN ('C01','C14') ORDER BY sample_id;
+
+-- B1: 영문 대문자 2자+숫자 2자
+SELECT sample_id, raw_text FROM study_codes WHERE rx_like(raw_text, '^S[0-9]{3}-[A-Z]{2}[0-9]{2}$')=1 ORDER BY sample_id;
+
+-- B2: [0-9]를 통한 끝 숫자
+SELECT sample_id, raw_text FROM study_codes WHERE rx_like(raw_text, '[0-9]{3}$')=1 ORDER BY sample_id;
+
+-- B3: 점 문자를 이스케이프
+SELECT sample_id, raw_text FROM study_codes WHERE rx_like(raw_text, '\.')=1 ORDER BY sample_id;
+
+-- B4: 더하기 문자를 이스케이프
+SELECT sample_id, raw_text FROM study_codes WHERE rx_like(raw_text, '\+')=1 ORDER BY sample_id;
+
+-- B5: 숫자가 아닌 문자 클래스
+SELECT sample_id, raw_text FROM study_codes WHERE rx_like(raw_text, '^S[0-9]{3}-[^0-9]')=1 ORDER BY sample_id;
+
+-- C1: 0개 이상 *
+SELECT sample_id, raw_text FROM study_codes WHERE rx_like(raw_text, '-AB[0-9]*$')=1 ORDER BY sample_id;
+
+-- C2: 1개 이상 +
+SELECT sample_id, raw_text FROM study_codes WHERE rx_like(raw_text, '-AB[0-9]+$')=1 ORDER BY sample_id;
+
+-- C3: 0개 또는 1개 ?
+SELECT sample_id, raw_text FROM study_codes WHERE rx_like(raw_text, '-AB[0-9]?$')=1 ORDER BY sample_id;
+
+-- C4: 2개에서 3개 {2,3}
+SELECT sample_id, raw_text FROM study_codes WHERE rx_like(raw_text, '-AB[0-9]{2,3}$')=1 ORDER BY sample_id;
+
+-- C5: 정확히 3개 {3}
+SELECT sample_id, raw_text FROM study_codes WHERE rx_like(raw_text, '^S[0-9]{3}-')=1 ORDER BY sample_id;
+
+-- D1: 부분 AB12
+SELECT sample_id,raw_text FROM study_codes WHERE rx_like(raw_text, 'AB12')=1 ORDER BY sample_id;
+
+-- D2: 끝까지 AB12
+SELECT sample_id,raw_text FROM study_codes WHERE rx_like(raw_text, 'AB12$')=1 ORDER BY sample_id;
+
+-- D3: 그룹과 선택
+SELECT sample_id,raw_text FROM study_codes WHERE rx_like(raw_text, '^S10(1|2)-')=1 ORDER BY sample_id;
+
+-- D4: 패턴 전체 앵커
+SELECT sample_id,raw_text FROM study_codes WHERE rx_like(raw_text, '^S101-AB12$')=1 ORDER BY sample_id;
+
+-- D5: 대소문자 플래그 차이
+SELECT rx_like('AbC','^abc$') AS case_sensitive,rx_like('AbC','^abc$','i') AS case_insensitive;
+
+-- E1: 예시 이메일 패턴
+SELECT sample_id,raw_text FROM study_contacts WHERE rx_like(raw_text, '^[A-Za-z0-9._+]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,}$')=1 ORDER BY sample_id;
+
+-- E2: 부분 도메인 검색
+SELECT sample_id,raw_text FROM study_contacts WHERE rx_like(raw_text, '@example[.]com$')=1 ORDER BY sample_id;
+
+-- E3: 대소문자 무시 도메인
+SELECT sample_id,raw_text FROM study_contacts WHERE rx_like(raw_text, '@example[.]com$','i')=1 ORDER BY sample_id;
+
+-- E4: 복수 @ 탐지
+SELECT sample_id,raw_text FROM study_contacts WHERE rx_like(raw_text, '@.*@')=1 ORDER BY sample_id;
+
+-- E5: NULL을 따로 확인
+SELECT sample_id, raw_text, rx_like(raw_text,'@') AS has_at FROM study_contacts WHERE sample_id IN ('T05','T06') ORDER BY sample_id;
+
+-- F1: 첫 코드 부분 추출
+SELECT sample_id,rx_substr(raw_text,'[A-Z]{2}[0-9]{2,4}') AS code_piece FROM study_codes WHERE sample_id IN ('C01','C02','C04') ORDER BY sample_id;
+
+-- F2: 두 번째 숫자 추출
+SELECT rx_substr('X12 Y345','[0-9]+',2) AS second_digits;
+
+-- F3: 매치 없는 추출
+SELECT rx_substr('ABC','[0-9]+') AS absent;
+
+-- F4: 캡처 그룹 추출
+SELECT rx_group('S101-AB12','^S[0-9]{3}-([A-Z]{2})([0-9]+)$',1) AS letters, rx_group('S101-AB12','^S[0-9]{3}-([A-Z]{2})([0-9]+)$',2) AS digits;
+
+-- F5: 전체 매치와 그룹의 차이
+SELECT rx_substr('S101-AB12','[A-Z]{2}[0-9]+') AS whole_match,rx_group('S101-AB12','([A-Z]{2})([0-9]+)',2) AS second_group;
+
+-- G1: 숫자 하나씩 마스킹
+SELECT rx_replace('S101-AB12','[0-9]','#') AS redacted;
+
+-- G2: 숫자 묶음 마스킹
+SELECT rx_replace('S101-AB12','[0-9]+','{NUM}') AS redacted;
+
+-- G3: 시작 위치는 1부터
+SELECT rx_instr('S101-AB12','AB') AS position_one_based;
+
+-- G4: 매치가 없으면 위치 0
+SELECT rx_instr('ABC','[0-9]+') AS not_found,rx_substr('ABC','[0-9]+') AS absent_text;
+
+-- G5: 숫자 묶음 2회
+SELECT rx_count('AB12-CD345','[0-9]+') AS groups_count;
+
+-- H1: 매치 결과 집계
+SELECT COUNT(*) AS total, SUM(CASE WHEN rx_like(raw_text,'^S[0-9]{3}-')=1 THEN 1 ELSE 0 END) AS matched, SUM(CASE WHEN raw_text IS NULL THEN 1 ELSE 0 END) AS null_source FROM study_codes;
+
+-- H2: LIKE와 정규식 % 차이
+SELECT 'AB%CD' LIKE '%\%%' ESCAPE '\' AS like_literal_percent,rx_like('AB%CD','%') AS rx_literal_percent;
+
+-- H3: 점: 와일드카드와 리터럴
+SELECT rx_like('A.B','A.B') AS dot_any, rx_like('ACB','A.B') AS matches_any, rx_like('ACB','A\.B') AS dot_literal_no;
+
+-- H4: LIKE와 regex 앵커
+SELECT rx_like('XAB12Y','AB12') AS contains_match,rx_like('XAB12Y','^AB12$') AS full_match;
+
+-- H5: 추출·치환 함께 확인
+SELECT sample_id,rx_substr(raw_text,'[0-9]+') AS first_number,rx_replace(raw_text,'[0-9]+','#') AS masked FROM study_codes WHERE sample_id IN ('C01','C07','C14') ORDER BY sample_id;
+e:[["children",{"s":"__PAGE__","h":160,"d":{"r":["$","$1","c",{"children":[["$","$L11",null,{"fullSql":"$12"}],["$L13","$L14","$L15"],"$L16"]}],"p":"$@17","v":null,"s":"$6"}}]]
+c:[["children",{"s":"regular-expressions","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@d","v":"$9","s":"$6"},"c":"$Qe"}]]
+a:[["children",{"s":"learn","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@b","v":"$9","s":"$6"},"c":"$Qc"}]]
+7:[["children",{"s":"sqld","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@8","v":"$9","s":"$6"},"c":"$Qa"}]]
+0:{"t":{"t":{"s":"","h":80,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}],"notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]]}]}]}]]}],"p":"$@5","v":null,"s":"$6"},"c":"$Q7"},"h":{"r":["$","$1","h",{"children":[null,["$","$L19",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","$L1b",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$1c",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"정규 표현식 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":"$@1d","v":null,"s":"$6"}},"a":"$@1e","u":"$@1f","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+20:I[97367,["$2"],"OutletBoundary"]
+:HL["/study-note-preview/_next/static/chunks/2mib94y9p_djf.css","style"]
+13:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/2mib94y9p_djf.css","precedence":"next"}]
+14:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/0uph653vf10jg.js","async":true}]
+15:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true}]
+16:["$","$L20",null,{"children":["$","$1c",null,{"name":"Next.MetadataOutlet","children":"$@21"}]}]
+6:300
+21:null
+1f:true
+6:C
+1e:0
+d:"$undefined"
+b:"$undefined"
+8:"$undefined"
+5:"$undefined"
+1d:"$undefined"
+17:"$undefined"

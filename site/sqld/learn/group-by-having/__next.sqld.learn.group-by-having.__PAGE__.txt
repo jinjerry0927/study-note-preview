@@ -1,0 +1,126 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+f:"/study-note-preview/_next/static/chunks/3ew3xfldjptgp.js"
+10:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+11:I[66986,["$2","$f","$10"],"GroupHavingPage"]
+18:"ViewportBoundary"
+19:I[97367,["$2"],"$18"]
+1a:"MetadataBoundary"
+1b:I[97367,["$2"],"$1a"]
+1c:"$Sreact.suspense"
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+6:X
+9:X
+9:C
+12:T1c72,-- 06P GROUP BY, HAVING / independent SQLite 3.x practice
+-- 06O's S101..S105 facts are preserved; S106 and bonus_points are 06P-only fictional data.
+-- NULL output is a SQL null; human-readable JSON renders it as "NULL".
+-- ORDER BY is explicit wherever row order is used for illustration.
+CREATE TABLE study_students (
+  student_id TEXT PRIMARY KEY NOT NULL,
+  student_name TEXT NOT NULL,
+  department_id TEXT,
+  study_hours INTEGER NOT NULL,
+  tag_code TEXT NOT NULL,
+  bonus_points INTEGER
+);
+INSERT INTO study_students (student_id, student_name, department_id, study_hours, tag_code, bonus_points) VALUES
+ ('S101','민지','D10',5,'sql_101',10),
+ ('S102','준호','D20',7,'db%202',NULL),
+ ('S103','민지','D10',8,'exam_3',20),
+ ('S104','하린','D20',9,'sql_404',0),
+ ('S105','유나',NULL,6,'sqlX5',NULL),
+ ('S106','도현','D10',10,'extra_6',NULL);
+
+-- [C1] Total rows, non-null bonus rows, distinct non-null department values
+SELECT COUNT(*) AS all_rows, COUNT(bonus_points) AS bonus_rows, COUNT(DISTINCT department_id) AS dept_values FROM study_students;
+-- [C2] D20 row count and non-null bonus count
+SELECT COUNT(*) AS all_rows, COUNT(bonus_points) AS bonus_rows FROM study_students WHERE department_id = 'D20';
+-- [C3] NULL department group's counts
+SELECT COUNT(*) AS all_rows, COUNT(bonus_points) AS bonus_rows FROM study_students WHERE department_id IS NULL;
+-- [C4] COUNT(DISTINCT) ignores NULL
+SELECT COUNT(bonus_points) AS non_null_count, COUNT(DISTINCT bonus_points) AS distinct_non_null_count FROM study_students;
+
+-- [A1] Aggregate values overall
+SELECT SUM(bonus_points) AS bonus_sum, AVG(bonus_points) AS bonus_avg, MIN(bonus_points) AS bonus_min, MAX(bonus_points) AS bonus_max FROM study_students;
+-- [A2] Zero is a value in D20
+SELECT SUM(bonus_points) AS bonus_sum, AVG(bonus_points) AS bonus_avg, MIN(bonus_points) AS bonus_min, MAX(bonus_points) AS bonus_max FROM study_students WHERE department_id='D20';
+-- [A3] Only NULL bonus inputs produce SQL NULL aggregations
+SELECT SUM(bonus_points) AS bonus_sum, AVG(bonus_points) AS bonus_avg, MIN(bonus_points) AS bonus_min, MAX(bonus_points) AS bonus_max FROM study_students WHERE department_id IS NULL;
+-- [A4] COALESCE changes denominator for AVG
+SELECT AVG(bonus_points) AS ignoring_null_avg, AVG(COALESCE(bonus_points, 0)) AS zero_filled_avg FROM study_students WHERE department_id='D10';
+
+-- [G1] Group three department values including a NULL group
+SELECT department_id, COUNT(*) AS student_count FROM study_students GROUP BY department_id ORDER BY CASE WHEN department_id IS NULL THEN 1 ELSE 0 END, department_id;
+-- [G2] Compare non-null counts and sums by department
+SELECT department_id, COUNT(*) AS student_count, COUNT(bonus_points) AS bonus_count, SUM(bonus_points) AS bonus_sum FROM study_students GROUP BY department_id ORDER BY CASE WHEN department_id IS NULL THEN 1 ELSE 0 END, department_id;
+-- [G3] Groups by department and present/missing bonus
+SELECT department_id, CASE WHEN bonus_points IS NULL THEN 'missing' ELSE 'present' END AS bonus_state, COUNT(*) AS student_count FROM study_students GROUP BY department_id, CASE WHEN bonus_points IS NULL THEN 'missing' ELSE 'present' END ORDER BY CASE WHEN department_id IS NULL THEN 1 ELSE 0 END, department_id, bonus_state;
+-- [G4] GROUP BY works without an aggregate function
+SELECT department_id FROM study_students GROUP BY department_id ORDER BY CASE WHEN department_id IS NULL THEN 1 ELSE 0 END, department_id;
+
+-- [R1] Grouping column and aggregate are portable
+SELECT department_id, SUM(study_hours) AS total_hours FROM study_students GROUP BY department_id ORDER BY CASE WHEN department_id IS NULL THEN 1 ELSE 0 END, department_id;
+-- [R2] Multiple GROUP BY keys match multiple output columns
+SELECT department_id, bonus_points, COUNT(*) AS student_count FROM study_students GROUP BY department_id, bonus_points ORDER BY CASE WHEN department_id IS NULL THEN 1 ELSE 0 END, department_id, CASE WHEN bonus_points IS NULL THEN 1 ELSE 0 END, bonus_points;
+-- [R3] MAX is a valid aggregate in the SELECT list
+SELECT department_id, MAX(study_hours) AS max_hours FROM study_students GROUP BY department_id ORDER BY CASE WHEN department_id IS NULL THEN 1 ELSE 0 END, department_id;
+
+-- [W1] WHERE selects individual students first
+SELECT student_id, department_id, study_hours FROM study_students WHERE study_hours>=8 ORDER BY student_id;
+-- [W2] GROUP BY sees only WHERE-filtered rows
+SELECT department_id, COUNT(*) AS student_count FROM study_students WHERE study_hours>=8 GROUP BY department_id ORDER BY department_id;
+
+-- [H1] HAVING filters groups after aggregation
+SELECT department_id, COUNT(*) AS student_count FROM study_students GROUP BY department_id HAVING COUNT(*)>=2 ORDER BY department_id;
+-- [H2] HAVING uses SUM to select only the positive-sum group
+SELECT department_id, SUM(bonus_points) AS bonus_sum FROM study_students GROUP BY department_id HAVING SUM(bonus_points)>0 ORDER BY department_id;
+-- [H3] A group can have COUNT(non-null)=0
+SELECT department_id, COUNT(bonus_points) AS bonus_count FROM study_students GROUP BY department_id HAVING COUNT(bonus_points)=0 ORDER BY CASE WHEN department_id IS NULL THEN 1 ELSE 0 END, department_id;
+
+-- [P1] WHERE>=8 then HAVING count>=2 leaves D10 only
+SELECT department_id, COUNT(*) AS student_count FROM study_students WHERE study_hours>=8 GROUP BY department_id HAVING COUNT(*)>=2 ORDER BY department_id;
+-- [P2] WHERE>=7 then HAVING count>=2 leaves D10 and D20
+SELECT department_id, COUNT(*) AS student_count, COUNT(bonus_points) AS bonus_count, SUM(bonus_points) AS bonus_sum FROM study_students WHERE study_hours>=7 GROUP BY department_id HAVING COUNT(*)>=2 ORDER BY department_id;
+-- [P3] Filter bonus non-NULL before counting the group
+SELECT department_id, COUNT(*) AS student_count FROM study_students WHERE bonus_points IS NOT NULL GROUP BY department_id HAVING COUNT(*)>=2 ORDER BY department_id;
+
+-- [O1] Descending by an aggregate alias
+SELECT department_id, COUNT(*) AS student_count FROM study_students WHERE department_id IS NOT NULL GROUP BY department_id ORDER BY student_count DESC, department_id ASC;
+-- [O2] Ascending by the same aggregate alias
+SELECT department_id, COUNT(*) AS student_count FROM study_students WHERE department_id IS NOT NULL GROUP BY department_id ORDER BY student_count ASC, department_id ASC;
+-- [O3] Display two aggregates, filter and sort by aggregate alias
+SELECT department_id, COUNT(*) AS student_count, SUM(study_hours) AS total_hours FROM study_students WHERE department_id IS NOT NULL GROUP BY department_id HAVING COUNT(*)>=2 ORDER BY total_hours DESC, department_id;
+
+-- [E1] Aggregate without GROUP BY on zero input returns one row
+SELECT COUNT(*) AS row_count, SUM(bonus_points) AS bonus_sum, AVG(bonus_points) AS bonus_avg FROM study_students WHERE study_hours>99;
+-- [E2] GROUP BY on zero input returns zero groups (zero rows)
+SELECT department_id, COUNT(*) AS student_count FROM study_students WHERE study_hours>99 GROUP BY department_id;
+-- [E3] HAVING without GROUP BY can keep the single aggregate group
+SELECT COUNT(*) AS row_count FROM study_students HAVING COUNT(*)>=6;
+-- [E4] HAVING without GROUP BY can eliminate the single aggregate group
+SELECT COUNT(*) AS row_count FROM study_students HAVING COUNT(*)>6;
+e:[["children",{"s":"__PAGE__","h":160,"d":{"r":["$","$1","c",{"children":[["$","$L11",null,{"fullSql":"$12"}],["$L13","$L14","$L15"],"$L16"]}],"p":"$@17","v":null,"s":"$6"}}]]
+c:[["children",{"s":"group-by-having","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@d","v":"$9","s":"$6"},"c":"$Qe"}]]
+a:[["children",{"s":"learn","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@b","v":"$9","s":"$6"},"c":"$Qc"}]]
+7:[["children",{"s":"sqld","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@8","v":"$9","s":"$6"},"c":"$Qa"}]]
+0:{"t":{"t":{"s":"","h":80,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}],"notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]]}]}]}]]}],"p":"$@5","v":null,"s":"$6"},"c":"$Q7"},"h":{"r":["$","$1","h",{"children":[null,["$","$L19",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","$L1b",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$1c",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"GROUP BY, HAVING 절 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":"$@1d","v":null,"s":"$6"}},"a":"$@1e","u":"$@1f","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+20:I[97367,["$2"],"OutletBoundary"]
+:HL["/study-note-preview/_next/static/chunks/0i639c957u75a.css","style"]
+13:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0i639c957u75a.css","precedence":"next"}]
+14:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3ew3xfldjptgp.js","async":true}]
+15:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true}]
+16:["$","$L20",null,{"children":["$","$1c",null,{"name":"Next.MetadataOutlet","children":"$@21"}]}]
+6:300
+21:null
+1f:true
+6:C
+1e:0
+d:"$undefined"
+b:"$undefined"
+8:"$undefined"
+5:"$undefined"
+1d:"$undefined"
+17:"$undefined"

@@ -1,0 +1,195 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+a:"/study-note-preview/_next/static/chunks/089eey8p-yoow.js"
+b:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+c:"StandardJoinPage"
+d:I[70019,["$2","$a","$b"],"$c"]
+13:"ViewportBoundary"
+14:I[97367,["$2"],"$13"]
+16:"MetadataBoundary"
+17:I[97367,["$2"],"$16"]
+18:"$Sreact.suspense"
+1a:I[68027,["$2"],"default",1]
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+:HL["/study-note-preview/_next/static/media/GowunDodum_Regular-s.p.2u6_opv7t0qh4.ttf","font",{"crossOrigin":"","type":"font/ttf"}]
+:HL["/study-note-preview/_next/static/media/NanumPenScript_Regular-s.p.22x2mpm22vzmt.ttf","font",{"crossOrigin":"","type":"font/ttf"}]
+:HL["/study-note-preview/_next/static/chunks/28didmq5s3m6y.css","style"]
+6:X
+e:T2380,-- 06S 표준 조인 / SQLite 3.39.0+ (RIGHT/FULL JOIN); verified on Python SQLite 3.46.1.
+-- 06R의 학생·학과·수강·강좌·시간 구간 데이터를 원본 그대로 유지.
+PRAGMA foreign_keys=ON;
+CREATE TABLE study_students (
+  student_id TEXT PRIMARY KEY NOT NULL,
+  student_name TEXT NOT NULL,
+  department_id TEXT,
+  study_hours INTEGER NOT NULL,
+  tag_code TEXT NOT NULL,
+  bonus_points INTEGER,
+  exam_score INTEGER
+);
+INSERT INTO study_students VALUES
+ ('S101','민지','D10',5,'sql_101',10,90),
+ ('S102','준호','D20',7,'db%202',NULL,80),
+ ('S103','민지','D10',8,'exam_3',20,90),
+ ('S104','하린','D20',9,'sql_404',0,80),
+ ('S105','유나',NULL,6,'sqlX5',NULL,NULL),
+ ('S106','도현','D10',10,'extra_6',NULL,95);
+CREATE TABLE study_departments (
+ department_id TEXT PRIMARY KEY NOT NULL,
+ department_name TEXT NOT NULL
+);
+INSERT INTO study_departments VALUES ('D10','컴퓨터'), ('D20','통계'), ('D30','디자인');
+CREATE TABLE study_courses (
+ course_id TEXT PRIMARY KEY NOT NULL,
+ course_name TEXT NOT NULL
+);
+INSERT INTO study_courses VALUES ('C01','SQL 입문'), ('C02','데이터 모델링'), ('C03','파이썬 기초');
+CREATE TABLE study_enrollments (
+ enrollment_id TEXT PRIMARY KEY NOT NULL,
+ student_id TEXT NOT NULL REFERENCES study_students(student_id),
+ course_id TEXT NOT NULL REFERENCES study_courses(course_id)
+);
+INSERT INTO study_enrollments VALUES
+ ('E01','S101','C01'), ('E02','S101','C02'), ('E03','S102','C01'),
+ ('E04','S103','C02'), ('E05','S104','C01'), ('E06','S106','C01'),
+ ('E07','S106','C03');
+CREATE TABLE study_bands (
+ band_id TEXT PRIMARY KEY NOT NULL,
+ min_hours INTEGER NOT NULL,
+ max_hours INTEGER NOT NULL
+);
+INSERT INTO study_bands VALUES ('B1',0,7), ('B2',7,9), ('B3',9,12);
+
+
+-- 06S 전용 작은 NATURAL JOIN 위험 시연 테이블 (06R 원본 테이블 변경 없음).
+CREATE TABLE natural_students (
+    sample_id TEXT PRIMARY KEY NOT NULL,
+    department_id TEXT NOT NULL,
+    campus_code TEXT NOT NULL
+);
+INSERT INTO natural_students VALUES
+ ('N1','D10','A'), ('N2','D10','B'), ('N3','D20','B'), ('N4','D20','A');
+CREATE TABLE natural_departments (
+    department_id TEXT NOT NULL,
+    campus_code TEXT NOT NULL,
+    label TEXT NOT NULL,
+    PRIMARY KEY(department_id, campus_code)
+);
+INSERT INTO natural_departments VALUES
+ ('D10','A','컴퓨터·A캠퍼스'), ('D20','B','통계·B캠퍼스'), ('D30','A','디자인·A캠퍼스');
+CREATE TABLE demo_codes_x (x_code TEXT PRIMARY KEY NOT NULL);
+INSERT INTO demo_codes_x VALUES ('X1'), ('X2');
+CREATE TABLE demo_codes_y (y_code TEXT PRIMARY KEY NOT NULL);
+INSERT INTO demo_codes_y VALUES ('Y1'), ('Y2'), ('Y3');
+
+-- [A1] JOIN ... ON (INNER 생략)
+SELECT s.student_id, d.department_name FROM study_students s JOIN study_departments d ON s.department_id = d.department_id ORDER BY s.student_id;
+
+-- [A2] INNER JOIN을 명시
+SELECT s.student_id, d.department_name FROM study_students s INNER JOIN study_departments d ON s.department_id = d.department_id ORDER BY s.student_id;
+
+-- [A3] 이전식 콤마와 WHERE
+SELECT s.student_id, d.department_name FROM study_students s, study_departments d WHERE s.department_id = d.department_id ORDER BY s.student_id;
+
+-- [B1] INNER: 양쪽 일치만
+SELECT s.student_id, d.department_id FROM study_students s INNER JOIN study_departments d ON s.department_id = d.department_id ORDER BY s.student_id;
+
+-- [B2] LEFT: 학생 모두 보존
+SELECT s.student_id, d.department_id FROM study_students s LEFT OUTER JOIN study_departments d ON s.department_id = d.department_id ORDER BY s.student_id;
+
+-- [B3] RIGHT: 학과 모두 보존
+SELECT s.student_id, d.department_id FROM study_students s RIGHT OUTER JOIN study_departments d ON s.department_id = d.department_id ORDER BY d.department_id, s.student_id;
+
+-- [B4] FULL: 학생·학과 양쪽 보존
+SELECT s.student_id, d.department_id FROM study_students s FULL OUTER JOIN study_departments d ON s.department_id = d.department_id ORDER BY CASE WHEN s.student_id IS NULL THEN 1 ELSE 0 END, s.student_id, d.department_id;
+
+-- [B5] RIGHT를 반대쪽 LEFT로
+SELECT s.student_id, d.department_id FROM study_departments d LEFT JOIN study_students s ON s.department_id = d.department_id ORDER BY d.department_id, s.student_id;
+
+-- [C1] ON에 학과 D10 제한
+SELECT s.student_id, d.department_name FROM study_students s LEFT JOIN study_departments d ON s.department_id = d.department_id AND d.department_id = 'D10' ORDER BY s.student_id;
+
+-- [C2] WHERE에 학과 D10 제한
+SELECT s.student_id, d.department_name FROM study_students s LEFT JOIN study_departments d ON s.department_id = d.department_id WHERE d.department_id = 'D10' ORDER BY s.student_id;
+
+-- [C3] ON에 학생 ID 조건 추가
+SELECT s.student_id, d.department_name FROM study_students s LEFT JOIN study_departments d ON s.department_id = d.department_id AND s.student_id = 'S101' ORDER BY s.student_id;
+
+-- [C4] ON에서 두 열 모두 비교
+SELECT n.sample_id, d.label FROM natural_students n INNER JOIN natural_departments d ON n.department_id = d.department_id AND n.campus_code = d.campus_code ORDER BY n.sample_id;
+
+-- [D1] 같은 이름 열 USING
+SELECT s.student_id, department_id, d.department_name FROM study_students s JOIN study_departments d USING (department_id) ORDER BY s.student_id;
+
+-- [D2] USING SELECT * 출력 구조
+SELECT * FROM study_students s JOIN study_departments d USING (department_id) ORDER BY s.student_id;
+
+-- [D3] ON SELECT * 출력 구조
+SELECT * FROM study_students s JOIN study_departments d ON s.department_id = d.department_id ORDER BY s.student_id;
+
+-- [D4] LEFT JOIN USING과 NULL
+SELECT department_id, s.student_id, d.department_name FROM study_students s LEFT JOIN study_departments d USING (department_id) ORDER BY s.student_id;
+
+-- [E1] NATURAL: 이름 같은 열 모두 결합
+SELECT n.sample_id, department_id, campus_code, d.label FROM natural_students n NATURAL JOIN natural_departments d ORDER BY n.sample_id;
+
+-- [E2] ON 학과 코드만 결합
+SELECT n.sample_id, n.department_id, n.campus_code, d.label FROM natural_students n JOIN natural_departments d ON n.department_id = d.department_id ORDER BY n.sample_id;
+
+-- [E3] USING 학과 코드만 명시
+SELECT n.sample_id, department_id, n.campus_code, d.label FROM natural_students n JOIN natural_departments d USING (department_id) ORDER BY n.sample_id;
+
+-- [E4] 공통 열이 없을 때 NATURAL
+SELECT x.x_code, y.y_code FROM demo_codes_x x NATURAL JOIN demo_codes_y y ORDER BY x.x_code, y.y_code;
+
+-- [F1] CROSS JOIN 6×3
+SELECT s.student_id, d.department_id FROM study_students s CROSS JOIN study_departments d ORDER BY s.student_id, d.department_id;
+
+-- [F2] CROSS 결과 중 D20만
+SELECT s.student_id, d.department_id FROM study_students s CROSS JOIN study_departments d WHERE d.department_id = 'D20' ORDER BY s.student_id;
+
+-- [F3] INNER JOIN ON 1=1
+SELECT s.student_id, d.department_id FROM study_students s INNER JOIN study_departments d ON 1 = 1 ORDER BY s.student_id, d.department_id;
+
+-- [G1] INNER 3테이블
+SELECT s.student_id, e.enrollment_id, c.course_name FROM study_students s JOIN study_enrollments e ON s.student_id = e.student_id JOIN study_courses c ON e.course_id = c.course_id ORDER BY e.enrollment_id;
+
+-- [G2] LEFT 2단계로 학생 보존
+SELECT s.student_id, e.enrollment_id, c.course_name FROM study_students s LEFT JOIN study_enrollments e ON s.student_id = e.student_id LEFT JOIN study_courses c ON e.course_id = c.course_id ORDER BY s.student_id, e.enrollment_id;
+
+-- [G3] 3테이블에서 SQL 입문만
+SELECT s.student_id, c.course_name FROM study_students s JOIN study_enrollments e ON s.student_id = e.student_id JOIN study_courses c ON e.course_id = c.course_id WHERE c.course_id = 'C01' ORDER BY s.student_id;
+
+-- [G4] LEFT 다음 INNER의 함정
+SELECT s.student_id, e.enrollment_id, c.course_name FROM study_students s LEFT JOIN study_enrollments e ON s.student_id = e.student_id INNER JOIN study_courses c ON e.course_id = c.course_id ORDER BY s.student_id, e.enrollment_id;
+
+-- [H1] 학과 이름 조건을 ON에
+SELECT s.student_id, d.department_name FROM study_students s LEFT JOIN study_departments d ON s.department_id = d.department_id AND d.department_name = '컴퓨터' ORDER BY s.student_id;
+
+-- [H2] 학과 이름 조건을 WHERE에
+SELECT s.student_id, d.department_name FROM study_students s LEFT JOIN study_departments d ON s.department_id = d.department_id WHERE d.department_name = '컴퓨터' ORDER BY s.student_id;
+
+-- [H3] C01 수강 조건을 ON에
+SELECT s.student_id, e.enrollment_id FROM study_students s LEFT JOIN study_enrollments e ON s.student_id = e.student_id AND e.course_id = 'C01' ORDER BY s.student_id, e.enrollment_id;
+
+-- [H4] C01 수강 조건을 WHERE에
+SELECT s.student_id, e.enrollment_id FROM study_students s LEFT JOIN study_enrollments e ON s.student_id = e.student_id WHERE e.course_id = 'C01' ORDER BY s.student_id, e.enrollment_id;
+
+-- [H5] 미수강 학생 찾기
+SELECT s.student_id FROM study_students s LEFT JOIN study_enrollments e ON s.student_id = e.student_id WHERE e.enrollment_id IS NULL ORDER BY s.student_id;
+9:[["children",{"s":"__PAGE__","h":512,"d":{"r":["$","$1","c",{"children":[["$","$Ld",null,{"fullSql":"$e"}],["$Lf","$L10","$L11"],"$L12"]}],"p":false,"v":null}}]]
+8:[["children",{"s":"standard-join","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$6"},"c":"$Q9"}]]
+7:[["children",{"s":"learn","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$6"},"c":"$Q8"}]]
+5:[["children",{"s":"sqld","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$6"},"c":"$Q7"}]]
+0:{"P":null,"c":["","sqld","learn","standard-join",""],"q":"","i":false,"t":{"t":{"s":"","h":528,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true,"nonce":"$undefined"}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}]}]}]]}],"p":false,"v":null},"c":"$Q5"},"h":{"r":["$","$1","h",{"children":[null,["$","$L14",null,{"children":"$L15"}],["$","$L17",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$18",null,{"name":"Next.Metadata","children":"$L19"}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":false,"v":null}},"m":"$undefined","G":["$1a",[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]]],"S":true,"r":"$undefined","s":"$undefined","a":"$undefined","l":"$undefined","p":"$undefined","d":"$undefined","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+1b:I[97367,["$2"],"OutletBoundary"]
+6:C
+f:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/28didmq5s3m6y.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]
+10:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/089eey8p-yoow.js","async":true,"nonce":"$undefined"}]
+11:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true,"nonce":"$undefined"}]
+12:["$","$L1b",null,{"children":["$","$18",null,{"name":"Next.MetadataOutlet","children":"$@1c"}]}]
+15:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]
+19:[["$","title","0",{"children":"표준 조인 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]
+1c:null

@@ -1,0 +1,209 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+f:"/study-note-preview/_next/static/chunks/0snwcwrk9-ohe.js"
+10:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+11:I[4307,["$2","$f","$10"],"SubqueryPage"]
+18:"ViewportBoundary"
+19:I[97367,["$2"],"$18"]
+1a:"MetadataBoundary"
+1b:I[97367,["$2"],"$1a"]
+1c:"$Sreact.suspense"
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+6:X
+9:X
+9:C
+12:T2bf3,-- 06T 서브쿼리: SQLite 실습 전용. 06S의 학생·학과·수강·강좌·시간구간 입력을 그대로 보존.
+-- ANY/ALL의 실제 SQL 구문은 이 SQLite 실행 파일에 포함하지 않음(Oracle/PostgreSQL 참고 문서에서 별도 설명).
+PRAGMA foreign_keys=ON;
+CREATE TABLE study_students (
+ student_id TEXT PRIMARY KEY NOT NULL,
+ student_name TEXT NOT NULL,
+ department_id TEXT,
+ study_hours INTEGER NOT NULL,
+ tag_code TEXT NOT NULL,
+ bonus_points INTEGER,
+ exam_score INTEGER
+);
+INSERT INTO study_students VALUES
+ ('S101','민지','D10',5,'sql_101',10,90),
+ ('S102','준호','D20',7,'db%202',NULL,80),
+ ('S103','민지','D10',8,'exam_3',20,90),
+ ('S104','하린','D20',9,'sql_404',0,80),
+ ('S105','유나',NULL,6,'sqlX5',NULL,NULL),
+ ('S106','도현','D10',10,'extra_6',NULL,95);
+CREATE TABLE study_departments (
+ department_id TEXT PRIMARY KEY NOT NULL,
+ department_name TEXT NOT NULL
+);
+INSERT INTO study_departments VALUES ('D10','컴퓨터'),('D20','통계'),('D30','디자인');
+CREATE TABLE study_courses (
+ course_id TEXT PRIMARY KEY NOT NULL,
+ course_name TEXT NOT NULL
+);
+INSERT INTO study_courses VALUES ('C01','SQL 입문'),('C02','데이터 모델링'),('C03','파이썬 기초');
+CREATE TABLE study_enrollments (
+ enrollment_id TEXT PRIMARY KEY NOT NULL,
+ student_id TEXT NOT NULL REFERENCES study_students(student_id),
+ course_id TEXT NOT NULL REFERENCES study_courses(course_id)
+);
+INSERT INTO study_enrollments VALUES
+ ('E01','S101','C01'),('E02','S101','C02'),('E03','S102','C01'),
+ ('E04','S103','C02'),('E05','S104','C01'),('E06','S106','C01'),
+ ('E07','S106','C03');
+CREATE TABLE study_bands (
+ band_id TEXT PRIMARY KEY NOT NULL,
+ min_hours INTEGER NOT NULL,
+ max_hours INTEGER NOT NULL
+);
+INSERT INTO study_bands VALUES ('B1',0,7),('B2',7,9),('B3',9,12);
+
+-- [A1] 안쪽 쿼리가 학과 코드 찾기
+SELECT d.department_id FROM study_departments d WHERE d.department_name = '컴퓨터' ORDER BY d.department_id;
+
+-- [A2] 내부 결과 D10으로 학생 선택
+SELECT s.student_id, s.department_id FROM study_students s WHERE s.department_id IN (SELECT d.department_id FROM study_departments d WHERE d.department_name = '컴퓨터') ORDER BY s.student_id;
+
+-- [A3] 중첩 서브쿼리로 C01 수강 찾기
+SELECT s.student_id FROM study_students s WHERE s.student_id IN (SELECT e.student_id FROM study_enrollments e WHERE e.course_id IN (SELECT c.course_id FROM study_courses c WHERE c.course_name = 'SQL 입문')) ORDER BY s.student_id;
+
+-- [A4] WHERE 비교값으로 평균 사용
+SELECT s.student_id, s.study_hours FROM study_students s WHERE s.study_hours > (SELECT AVG(t.study_hours) FROM study_students t) ORDER BY s.student_id;
+
+-- [B1] 단일행·단일열 평균과 비교
+SELECT s.student_id FROM study_students s WHERE s.study_hours > (SELECT AVG(t.study_hours) FROM study_students t) ORDER BY s.student_id;
+
+-- [B2] 다중행·단일열 IN
+SELECT s.student_id FROM study_students s WHERE s.department_id IN (SELECT d.department_id FROM study_departments d WHERE d.department_id IN ('D10','D20')) ORDER BY s.student_id;
+
+-- [B3] 다중열 행값 (두 열 동시 비교)
+SELECT s.student_id, s.department_id, s.exam_score FROM study_students s WHERE (s.department_id, s.exam_score) IN (SELECT t.department_id, t.exam_score FROM study_students t WHERE t.student_id IN ('S101','S102')) ORDER BY s.student_id;
+
+-- [B4] 한 행이 보장된 키로 등호 비교
+SELECT s.student_id FROM study_students s WHERE s.department_id = (SELECT d.department_id FROM study_departments d WHERE d.department_id = 'D10') ORDER BY s.student_id;
+
+-- [B5] SQLite 전용: 스칼라에 다중행 입력
+SELECT (SELECT s.student_id FROM study_students s WHERE s.department_id='D10' ORDER BY s.student_id) AS sqlite_scalar_first;
+
+-- [C1] IN으로 수강한 학생 5명
+SELECT s.student_id FROM study_students s WHERE s.student_id IN (SELECT e.student_id FROM study_enrollments e) ORDER BY s.student_id;
+
+-- [C2] EXISTS로 수강한 학생 5명
+SELECT s.student_id FROM study_students s WHERE EXISTS (SELECT 1 FROM study_enrollments e WHERE e.student_id=s.student_id) ORDER BY s.student_id;
+
+-- [C3] NOT EXISTS로 수강 없는 학생
+SELECT s.student_id FROM study_students s WHERE NOT EXISTS (SELECT 1 FROM study_enrollments e WHERE e.student_id=s.student_id) ORDER BY s.student_id;
+
+-- [C4] > ANY 의미의 SQLite 실습(비NULL 80·90)
+SELECT s.student_id, s.exam_score FROM study_students s WHERE EXISTS (SELECT 1 FROM study_students t WHERE t.student_id IN ('S101','S102') AND s.exam_score > t.exam_score) ORDER BY s.student_id;
+
+-- [C5] > ALL 의미의 SQLite 실습(비NULL 80·90)
+SELECT s.student_id, s.exam_score FROM study_students s WHERE s.exam_score IS NOT NULL AND NOT EXISTS (SELECT 1 FROM study_students t WHERE t.student_id IN ('S101','S102') AND s.exam_score <= t.exam_score) ORDER BY s.student_id;
+
+-- [C6] EXISTS는 SELECT NULL이어도 행만 봄
+SELECT EXISTS (SELECT NULL FROM study_enrollments e WHERE e.student_id='S101') AS exists_flag;
+
+-- [C7] EXISTS의 안쪽 결과가 0행이면 거짓
+SELECT EXISTS (SELECT 1 FROM study_enrollments e WHERE e.student_id='S105') AS exists_flag;
+
+-- [D1] 학과별 평균보다 긴 학습시간
+SELECT s.student_id, s.department_id, s.study_hours FROM study_students s WHERE s.study_hours > (SELECT AVG(t.study_hours) FROM study_students t WHERE t.department_id=s.department_id) ORDER BY s.student_id;
+
+-- [D2] 고정 기준 평균은 비연관 서브쿼리
+SELECT s.student_id, s.study_hours FROM study_students s WHERE s.study_hours > (SELECT AVG(t.study_hours) FROM study_students t WHERE t.study_hours >= 7) ORDER BY s.student_id;
+
+-- [D3] 학생마다 C01 신청 존재 여부
+SELECT s.student_id FROM study_students s WHERE EXISTS (SELECT 1 FROM study_enrollments e WHERE e.student_id=s.student_id AND e.course_id='C01') ORDER BY s.student_id;
+
+-- [D4] 외부 행별 수강 개수 스칼라
+SELECT s.student_id, (SELECT COUNT(*) FROM study_enrollments e WHERE e.student_id=s.student_id) AS enrollment_count FROM study_students s ORDER BY s.student_id;
+
+-- [D5] 외부 학생을 참조한 C02 신청
+SELECT s.student_id FROM study_students s WHERE EXISTS (SELECT 1 FROM study_enrollments e WHERE e.student_id=s.student_id AND e.course_id='C02') ORDER BY s.student_id;
+
+-- [E1] SELECT 절의 스칼라 학과명
+SELECT s.student_id, (SELECT d.department_name FROM study_departments d WHERE d.department_id=s.department_id) AS department_name FROM study_students s ORDER BY s.student_id;
+
+-- [E2] 0행 스칼라 결과는 NULL
+SELECT (SELECT d.department_name FROM study_departments d WHERE d.department_id='D99') AS absent_department;
+
+-- [E3] COUNT(*) 스칼라면 수강 없음은 0
+SELECT s.student_id, (SELECT COUNT(*) FROM study_enrollments e WHERE e.student_id=s.student_id) AS enrollment_count FROM study_students s ORDER BY s.student_id;
+
+-- [E4] 전역 스칼라를 출력 열로
+SELECT s.student_id, s.study_hours, (SELECT AVG(t.study_hours) FROM study_students t) AS overall_avg FROM study_students s ORDER BY s.student_id;
+
+-- [E5] MAX 집계는 고유한 한 값
+SELECT (SELECT MAX(s.exam_score) FROM study_students s) AS highest_score;
+
+-- [F1] FROM에서 학과별 집계 후 필터
+SELECT v.department_id, v.student_count FROM (SELECT s.department_id, COUNT(*) AS student_count FROM study_students s GROUP BY s.department_id) v WHERE v.student_count >= 2 ORDER BY v.department_id;
+
+-- [F2] 인라인 뷰로 긴 학습시간 조회
+SELECT v.student_id, v.study_hours FROM (SELECT s.student_id, s.study_hours FROM study_students s WHERE s.study_hours>=8) v ORDER BY v.study_hours DESC, v.student_id ASC;
+
+-- [F3] 수강 건수 인라인 뷰를 LEFT JOIN
+SELECT s.student_id, COALESCE(v.enrollment_count,0) AS enrollment_count FROM study_students s LEFT JOIN (SELECT e.student_id, COUNT(*) AS enrollment_count FROM study_enrollments e GROUP BY e.student_id) v ON s.student_id=v.student_id ORDER BY s.student_id;
+
+-- [F4] Top 2 인라인 뷰(바깥 정렬 명시)
+SELECT v.student_id, v.exam_score FROM (SELECT s.student_id, s.exam_score FROM study_students s ORDER BY s.exam_score DESC, s.student_id ASC LIMIT 2) v ORDER BY v.exam_score DESC, v.student_id ASC;
+
+-- [G1] NOT IN 안쪽 NULL을 제거하지 않으면?
+SELECT d.department_id FROM study_departments d WHERE d.department_id NOT IN (SELECT s.department_id FROM study_students s) ORDER BY d.department_id;
+
+-- [G2] NOT IN의 내부 NULL 제외
+SELECT d.department_id FROM study_departments d WHERE d.department_id NOT IN (SELECT s.department_id FROM study_students s WHERE s.department_id IS NOT NULL) ORDER BY d.department_id;
+
+-- [G3] NOT EXISTS로 소속 학생 없는 학과
+SELECT d.department_id FROM study_departments d WHERE NOT EXISTS (SELECT 1 FROM study_students s WHERE s.department_id=d.department_id) ORDER BY d.department_id;
+
+-- [G4] NOT IN과 NOT EXISTS의 D30 차이 표시
+SELECT d.department_id, d.department_id NOT IN (SELECT s.department_id FROM study_students s) AS not_in_flag, NOT EXISTS (SELECT 1 FROM study_students s WHERE s.department_id=d.department_id) AS not_exists_flag FROM study_departments d ORDER BY d.department_id;
+
+-- [G5] 미수강 학생은 NOT EXISTS
+SELECT s.student_id FROM study_students s WHERE NOT EXISTS (SELECT 1 FROM study_enrollments e WHERE e.student_id=s.student_id) ORDER BY s.student_id;
+
+-- [G6] 빈 집합이면 NULL IN / NOT IN도 0 / 1
+SELECT NULL IN (SELECT d.department_id FROM study_departments d WHERE 1=0) AS in_empty, NULL NOT IN (SELECT d.department_id FROM study_departments d WHERE 1=0) AS not_in_empty;
+
+-- [H1] 2단 중첩: SQL 입문 수강 학생
+SELECT s.student_id FROM study_students s WHERE s.student_id IN (SELECT e.student_id FROM study_enrollments e WHERE e.course_id IN (SELECT c.course_id FROM study_courses c WHERE c.course_name='SQL 입문')) ORDER BY s.student_id;
+
+-- [H2] 미배정 학과를 NOT EXISTS로
+SELECT d.department_id, d.department_name FROM study_departments d WHERE NOT EXISTS (SELECT 1 FROM study_students s WHERE s.department_id=d.department_id) ORDER BY d.department_id;
+
+-- [H3] 수강 학생만 스칼라 건수 함께 표시
+SELECT s.student_id, (SELECT COUNT(*) FROM study_enrollments e WHERE e.student_id=s.student_id) AS enrollment_count FROM study_students s WHERE EXISTS (SELECT 1 FROM study_enrollments e WHERE e.student_id=s.student_id) ORDER BY s.student_id;
+
+-- [H4] 인라인 뷰와 IN으로 학과·시간 교집합
+SELECT v.student_id, v.study_hours FROM (SELECT s.student_id, s.study_hours FROM study_students s WHERE s.department_id IN (SELECT d.department_id FROM study_departments d WHERE d.department_name='컴퓨터')) v WHERE v.study_hours>=8 ORDER BY v.student_id;
+
+-- [H5] 90점 이상 학생이 있는 학과
+SELECT d.department_id, d.department_name FROM study_departments d WHERE EXISTS (SELECT 1 FROM study_students s WHERE s.department_id=d.department_id AND s.exam_score>=90) ORDER BY d.department_id;
+
+-- [H6] 상관 평균과 수강 EXISTS 동시 검사
+SELECT s.student_id FROM study_students s WHERE s.department_id IS NOT NULL AND s.study_hours > (SELECT AVG(t.study_hours) FROM study_students t WHERE t.department_id=s.department_id) AND EXISTS (SELECT 1 FROM study_enrollments e WHERE e.student_id=s.student_id) ORDER BY s.student_id;
+
+e:[["children",{"s":"__PAGE__","h":160,"d":{"r":["$","$1","c",{"children":[["$","$L11",null,{"fullSql":"$12"}],["$L13","$L14","$L15"],"$L16"]}],"p":"$@17","v":null,"s":"$6"}}]]
+c:[["children",{"s":"subquery","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@d","v":"$9","s":"$6"},"c":"$Qe"}]]
+a:[["children",{"s":"learn","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@b","v":"$9","s":"$6"},"c":"$Qc"}]]
+7:[["children",{"s":"sqld","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@8","v":"$9","s":"$6"},"c":"$Qa"}]]
+0:{"t":{"t":{"s":"","h":80,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}],"notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]]}]}]}]]}],"p":"$@5","v":null,"s":"$6"},"c":"$Q7"},"h":{"r":["$","$1","h",{"children":[null,["$","$L19",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","$L1b",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$1c",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"서브쿼리 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":"$@1d","v":null,"s":"$6"}},"a":"$@1e","u":"$@1f","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+20:I[97367,["$2"],"OutletBoundary"]
+:HL["/study-note-preview/_next/static/chunks/10vehj55emtuu.css","style"]
+13:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/10vehj55emtuu.css","precedence":"next"}]
+14:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/0snwcwrk9-ohe.js","async":true}]
+15:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true}]
+16:["$","$L20",null,{"children":["$","$1c",null,{"name":"Next.MetadataOutlet","children":"$@21"}]}]
+6:300
+21:null
+1f:true
+6:C
+1e:0
+d:"$undefined"
+b:"$undefined"
+8:"$undefined"
+5:"$undefined"
+1d:"$undefined"
+17:"$undefined"

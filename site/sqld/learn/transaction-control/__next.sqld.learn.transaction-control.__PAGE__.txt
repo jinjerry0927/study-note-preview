@@ -1,0 +1,35 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+f:"/study-note-preview/_next/static/chunks/21rnqlt94y00x.js"
+10:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+11:"/study-note-preview/_next/static/chunks/2kvc523dqer2-.js"
+12:I[92312,["$2","$f","$10","$11"],"TclPage"]
+13:I[97367,["$2"],"OutletBoundary"]
+14:"$Sreact.suspense"
+17:"ViewportBoundary"
+18:I[97367,["$2"],"$17"]
+19:"MetadataBoundary"
+1a:I[97367,["$2"],"$19"]
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+:HL["/study-note-preview/_next/static/chunks/0a044f7z480yn.css","style"]
+6:X
+9:X
+9:C
+e:[["children",{"s":"__PAGE__","h":160,"d":{"r":["$","$1","c",{"children":[["$","$L12",null,{"setup":"-- 06AC TCL | 독립 실습 초기 상태 (SQLite 3.46.1 검사)\nPRAGMA foreign_keys=ON;\nCREATE TABLE students (student_id TEXT PRIMARY KEY, student_name TEXT NOT NULL, study_hours INTEGER NOT NULL CHECK(study_hours BETWEEN 0 AND 100));\nCREATE TABLE accounts (acct TEXT PRIMARY KEY, balance INTEGER NOT NULL CHECK(balance>=0));\nCREATE TABLE payments (payment_id TEXT PRIMARY KEY, student_id TEXT NOT NULL REFERENCES students(student_id), amount INTEGER NOT NULL CHECK(amount>0));\nINSERT INTO students VALUES ('S101','민지',5),('S102','준호',7),('S103','서연',8),('S104','지훈',9),('S105','유나',6);\nINSERT INTO accounts VALUES ('A',100),('B',100);\n"}],[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0a044f7z480yn.css","precedence":"next"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/21rnqlt94y00x.js","async":true}],["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true}],["$","script","script-2",{"src":"/study-note-preview/_next/static/chunks/2kvc523dqer2-.js","async":true}]],["$","$L13",null,{"children":["$","$14",null,{"name":"Next.MetadataOutlet","children":"$@15"}]}]]}],"p":"$@16","v":null,"s":"$6"}}]]
+c:[["children",{"s":"transaction-control","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@d","v":"$9","s":"$6"},"c":"$Qe"}]]
+a:[["children",{"s":"learn","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@b","v":"$9","s":"$6"},"c":"$Qc"}]]
+7:[["children",{"s":"sqld","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@8","v":"$9","s":"$6"},"c":"$Qa"}]]
+0:{"t":{"t":{"s":"","h":80,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}],"notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]]}]}]}]]}],"p":"$@5","v":null,"s":"$6"},"c":"$Q7"},"h":{"r":["$","$1","h",{"children":[null,["$","$L18",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","$L1a",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$14",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"TCL 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":"$@1b","v":null,"s":"$6"}},"a":"$@1c","u":"$@1d","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+15:null
+6:300
+1d:true
+6:C
+1c:0
+d:"$undefined"
+b:"$undefined"
+8:"$undefined"
+5:"$undefined"
+1b:"$undefined"
+16:"$undefined"

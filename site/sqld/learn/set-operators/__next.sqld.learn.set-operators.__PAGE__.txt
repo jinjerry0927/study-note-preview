@@ -1,0 +1,213 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+f:"/study-note-preview/_next/static/chunks/32f9lky53xua8.js"
+10:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+11:"SetOperatorsPage"
+12:I[15959,["$2","$f","$10"],"$11"]
+19:"ViewportBoundary"
+1a:I[97367,["$2"],"$19"]
+1b:"MetadataBoundary"
+1c:I[97367,["$2"],"$1b"]
+1d:"$Sreact.suspense"
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+6:X
+9:X
+9:C
+13:T28ef,-- 06U 집합 연산자: SQLite 실행 전용, 새 빈 DB에서 실행.
+-- 06T의 기존 학생·학과·수강·강좌·시간구간 5개 테이블 데이터는 변경하지 않음.
+-- demo_set_a/b, demo_pairs_a/b는 이 단원에서 NULL·중복·행쌍 비교를 보이기 위한 별도 교육용 가상 데이터.
+PRAGMA foreign_keys=ON;
+CREATE TABLE study_students (
+ student_id TEXT PRIMARY KEY NOT NULL,
+ student_name TEXT NOT NULL,
+ department_id TEXT,
+ study_hours INTEGER NOT NULL,
+ tag_code TEXT NOT NULL,
+ bonus_points INTEGER,
+ exam_score INTEGER
+);
+INSERT INTO study_students VALUES
+ ('S101','민지','D10',5,'sql_101',10,90),
+ ('S102','준호','D20',7,'db%202',NULL,80),
+ ('S103','민지','D10',8,'exam_3',20,90),
+ ('S104','하린','D20',9,'sql_404',0,80),
+ ('S105','유나',NULL,6,'sqlX5',NULL,NULL),
+ ('S106','도현','D10',10,'extra_6',NULL,95);
+CREATE TABLE study_departments (
+ department_id TEXT PRIMARY KEY NOT NULL,
+ department_name TEXT NOT NULL
+);
+INSERT INTO study_departments VALUES ('D10','컴퓨터'),('D20','통계'),('D30','디자인');
+CREATE TABLE study_courses (
+ course_id TEXT PRIMARY KEY NOT NULL,
+ course_name TEXT NOT NULL
+);
+INSERT INTO study_courses VALUES ('C01','SQL 입문'),('C02','데이터 모델링'),('C03','파이썬 기초');
+CREATE TABLE study_enrollments (
+ enrollment_id TEXT PRIMARY KEY NOT NULL,
+ student_id TEXT NOT NULL REFERENCES study_students(student_id),
+ course_id TEXT NOT NULL REFERENCES study_courses(course_id)
+);
+INSERT INTO study_enrollments VALUES
+ ('E01','S101','C01'),('E02','S101','C02'),('E03','S102','C01'),
+ ('E04','S103','C02'),('E05','S104','C01'),('E06','S106','C01'),
+ ('E07','S106','C03');
+CREATE TABLE study_bands (
+ band_id TEXT PRIMARY KEY NOT NULL,
+ min_hours INTEGER NOT NULL,
+ max_hours INTEGER NOT NULL
+);
+INSERT INTO study_bands VALUES ('B1',0,7),('B2',7,9),('B3',9,12);
+CREATE TABLE demo_set_a(tag TEXT);
+INSERT INTO demo_set_a(tag) VALUES ('SQL'),(NULL),('SQL'),('DATA'),(NULL),('MODEL');
+CREATE TABLE demo_set_b(tag TEXT);
+INSERT INTO demo_set_b(tag) VALUES ('SQL'),(NULL),('AI'),('AI');
+CREATE TABLE demo_pairs_a(dept TEXT, mark INTEGER);
+INSERT INTO demo_pairs_a(dept,mark) VALUES ('D10',90),('D10',90),('D20',80),(NULL,80),('D30',NULL),(NULL,NULL);
+CREATE TABLE demo_pairs_b(dept TEXT, mark INTEGER);
+INSERT INTO demo_pairs_b(dept,mark) VALUES ('D10',90),('D20',95),('D20',95),(NULL,80),(NULL,NULL);
+
+-- [A1] 열 1개: 이름은 달라도 같은 위치
+SELECT student_id AS learner FROM study_students WHERE department_id='D10' UNION SELECT student_id AS enrolled FROM study_enrollments WHERE course_id='C01' ORDER BY learner;
+
+-- [A2] 같은 위치의 학과 코드 한 열
+SELECT department_id AS dept FROM study_departments UNION SELECT department_id AS code FROM study_students WHERE department_id IS NOT NULL ORDER BY dept;
+
+-- [A3] 두 열: 열 개수 맞춰 합치기
+SELECT student_id AS learner, department_id AS dept FROM study_students WHERE department_id='D10' UNION SELECT student_id, department_id FROM study_students WHERE department_id='D20' ORDER BY learner;
+
+-- [A4] 중복을 보존하는 1열 합치기
+SELECT student_id AS learner FROM study_students WHERE department_id='D10' UNION ALL SELECT student_id FROM study_enrollments WHERE course_id='C01' ORDER BY learner;
+
+-- [A5] 명시적 CAST로 같은 타입 맞추기
+SELECT CAST(study_hours AS TEXT) AS hours_text FROM study_students WHERE student_id IN ('S101','S102') UNION SELECT CAST(study_hours AS TEXT) FROM study_students WHERE student_id='S103' ORDER BY hours_text;
+
+-- [B1] UNION: D10 학생 ∪ C01 수강
+SELECT student_id FROM study_students WHERE department_id='D10' UNION SELECT student_id FROM study_enrollments WHERE course_id='C01' ORDER BY student_id;
+
+-- [B2] UNION ALL: 겹치는 학생 반복
+SELECT student_id FROM study_students WHERE department_id='D10' UNION ALL SELECT student_id FROM study_enrollments WHERE course_id='C01' ORDER BY student_id;
+
+-- [B3] 원본에서 같은 ID가 이미 반복
+SELECT student_id FROM study_enrollments WHERE student_id IN ('S101','S106') UNION ALL SELECT student_id FROM study_students WHERE student_id='S101' ORDER BY student_id;
+
+-- [B4] B3를 UNION으로 바꾸면
+SELECT student_id FROM study_enrollments WHERE student_id IN ('S101','S106') UNION SELECT student_id FROM study_students WHERE student_id='S101' ORDER BY student_id;
+
+-- [B5] 두 열이면 행 전체로 중복 판정
+SELECT student_id, course_id FROM study_enrollments WHERE student_id IN ('S101','S106') UNION SELECT student_id, course_id FROM study_enrollments WHERE course_id='C01' ORDER BY student_id, course_id;
+
+-- [C1] D10 ∩ C01: 두 집합에 있는 학생
+SELECT student_id FROM study_students WHERE department_id='D10' INTERSECT SELECT student_id FROM study_enrollments WHERE course_id='C01' ORDER BY student_id;
+
+-- [C2] D10 ∩ C02
+SELECT student_id FROM study_students WHERE department_id='D10' INTERSECT SELECT student_id FROM study_enrollments WHERE course_id='C02' ORDER BY student_id;
+
+-- [C3] C01 ∩ C02
+SELECT student_id FROM study_enrollments WHERE course_id='C01' INTERSECT SELECT student_id FROM study_enrollments WHERE course_id='C02' ORDER BY student_id;
+
+-- [C4] 학생에 있는 학과 ∩ 등록 학과
+SELECT department_id FROM study_students INTERSECT SELECT department_id FROM study_departments ORDER BY department_id;
+
+-- [C5] 두 열 교집합도 행쌍 기준
+SELECT student_id, course_id FROM study_enrollments WHERE course_id IN ('C01','C02') INTERSECT SELECT student_id, course_id FROM study_enrollments WHERE student_id='S101' ORDER BY student_id, course_id;
+
+-- [D1] C01 수강자 − D10 학생
+SELECT student_id FROM study_enrollments WHERE course_id='C01' EXCEPT SELECT student_id FROM study_students WHERE department_id='D10' ORDER BY student_id;
+
+-- [D2] D10 학생 − C01 수강자
+SELECT student_id FROM study_students WHERE department_id='D10' EXCEPT SELECT student_id FROM study_enrollments WHERE course_id='C01' ORDER BY student_id;
+
+-- [D3] 전체 학생 − 수강 기록 학생
+SELECT student_id FROM study_students EXCEPT SELECT student_id FROM study_enrollments ORDER BY student_id;
+
+-- [D4] 학과 − 학생이 사용하는 학과 코드
+SELECT department_id FROM study_departments EXCEPT SELECT department_id FROM study_students ORDER BY department_id;
+
+-- [D5] 수강 학생 − 8시간 미만 학생
+SELECT student_id FROM study_enrollments EXCEPT SELECT student_id FROM study_students WHERE study_hours < 8 ORDER BY student_id;
+
+-- [E1] NULL·중복 포함 UNION
+SELECT tag FROM demo_set_a UNION SELECT tag FROM demo_set_b ORDER BY tag;
+
+-- [E2] 같은 입력의 UNION ALL
+SELECT tag FROM demo_set_a UNION ALL SELECT tag FROM demo_set_b ORDER BY tag;
+
+-- [E3] NULL도 교집합의 중복 판정
+SELECT tag FROM demo_set_a INTERSECT SELECT tag FROM demo_set_b ORDER BY tag;
+
+-- [E4] NULL 포함 행을 오른쪽 목록으로 제거
+SELECT tag FROM demo_set_a EXCEPT SELECT tag FROM demo_set_b ORDER BY tag;
+
+-- [E5] 반대 차집합에서 AI 중복 제거
+SELECT tag FROM demo_set_b EXCEPT SELECT tag FROM demo_set_a ORDER BY tag;
+
+-- [F1] 2열 UNION의 NULL·행쌍
+SELECT dept, mark FROM demo_pairs_a UNION SELECT dept, mark FROM demo_pairs_b ORDER BY dept, mark;
+
+-- [F2] 2열 UNION ALL은 6+5행
+SELECT dept, mark FROM demo_pairs_a UNION ALL SELECT dept, mark FROM demo_pairs_b ORDER BY dept, mark;
+
+-- [F3] 2열 INTERSECT: 행 전체 비교
+SELECT dept, mark FROM demo_pairs_a INTERSECT SELECT dept, mark FROM demo_pairs_b ORDER BY dept, mark;
+
+-- [F4] 2열 EXCEPT: LEFT에서만 있는 행
+SELECT dept, mark FROM demo_pairs_a EXCEPT SELECT dept, mark FROM demo_pairs_b ORDER BY dept, mark;
+
+-- [F5] 열 이름이 달라도 위치가 동일하면
+SELECT dept AS left_dept, mark AS left_score FROM demo_pairs_a INTERSECT SELECT dept AS right_dept, mark AS right_score FROM demo_pairs_b ORDER BY left_dept, left_score;
+
+-- [G1] UNION 결과를 최종 DESC 정렬
+SELECT student_id AS person FROM study_students WHERE department_id='D10' UNION SELECT student_id AS enrolled FROM study_enrollments WHERE course_id='C01' ORDER BY person DESC;
+
+-- [G2] UNION ALL에도 ORDER BY는 맨 뒤
+SELECT student_id AS person FROM study_students WHERE department_id='D10' UNION ALL SELECT student_id AS enrolled FROM study_enrollments WHERE course_id='C01' ORDER BY person ASC;
+
+-- [G3] 출력 열 이름은 첫 번째 SELECT
+SELECT department_id AS dept FROM study_departments UNION SELECT department_id AS other_alias FROM study_students WHERE department_id IS NOT NULL ORDER BY dept;
+
+-- [G4] 계산식 정렬은 바깥 SELECT로
+SELECT person FROM (SELECT student_id AS person FROM study_students WHERE department_id='D10' UNION SELECT student_id AS person FROM study_enrollments WHERE course_id='C01') combined ORDER BY CASE WHEN person='S103' THEN 0 ELSE 1 END, person;
+
+-- [G5] 교집합 전체를 내림차순 정렬
+SELECT student_id AS person FROM study_students WHERE department_id='D10' INTERSECT SELECT student_id AS person FROM study_enrollments WHERE course_id='C01' ORDER BY person DESC;
+
+-- [H1] SQLite: A UNION B INTERSECT C
+SELECT student_id FROM study_students WHERE department_id='D10' UNION SELECT student_id FROM study_enrollments WHERE course_id='C01' INTERSECT SELECT student_id FROM study_enrollments WHERE course_id='C02' ORDER BY student_id;
+
+-- [H2] 명시적으로 (A UNION B) ∩ C
+SELECT student_id FROM (SELECT student_id FROM study_students WHERE department_id='D10' UNION SELECT student_id FROM study_enrollments WHERE course_id='C01') ab INTERSECT SELECT student_id FROM study_enrollments WHERE course_id='C02' ORDER BY student_id;
+
+-- [H3] 명시적으로 A ∪ (B INTERSECT C)
+SELECT student_id FROM study_students WHERE department_id='D10' UNION SELECT student_id FROM (SELECT student_id FROM study_enrollments WHERE course_id='C01' INTERSECT SELECT student_id FROM study_enrollments WHERE course_id='C02') bc ORDER BY student_id;
+
+-- [H4] SQLite: (A UNION B) EXCEPT C
+SELECT student_id FROM study_students WHERE department_id='D10' UNION SELECT student_id FROM study_enrollments WHERE course_id='C01' EXCEPT SELECT student_id FROM study_enrollments WHERE course_id='C02' ORDER BY student_id;
+
+-- [H5] 명시적으로 A UNION (B EXCEPT C)
+SELECT student_id FROM study_students WHERE department_id='D10' UNION SELECT student_id FROM (SELECT student_id FROM study_enrollments WHERE course_id='C01' EXCEPT SELECT student_id FROM study_enrollments WHERE course_id='C02') bc ORDER BY student_id;
+
+e:[["children",{"s":"__PAGE__","h":160,"d":{"r":["$","$1","c",{"children":[["$","$L12",null,{"fullSql":"$13"}],["$L14","$L15","$L16"],"$L17"]}],"p":"$@18","v":null,"s":"$6"}}]]
+c:[["children",{"s":"set-operators","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@d","v":"$9","s":"$6"},"c":"$Qe"}]]
+a:[["children",{"s":"learn","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@b","v":"$9","s":"$6"},"c":"$Qc"}]]
+7:[["children",{"s":"sqld","h":96,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}]}]]}],"p":"$@8","v":"$9","s":"$6"},"c":"$Qa"}]]
+0:{"t":{"t":{"s":"","h":80,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","template":["$","$L4",null,{}],"notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]]}]}]}]]}],"p":"$@5","v":null,"s":"$6"},"c":"$Q7"},"h":{"r":["$","$1","h",{"children":[null,["$","$L1a",null,{"children":[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]}],["$","$L1c",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$1d",null,{"name":"Next.Metadata","children":[["$","title","0",{"children":"집합 연산자 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":"$@1e","v":null,"s":"$6"}},"a":"$@1f","u":"$@20","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+21:I[97367,["$2"],"OutletBoundary"]
+:HL["/study-note-preview/_next/static/chunks/1o_bi3purf6d4.css","style"]
+14:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/1o_bi3purf6d4.css","precedence":"next"}]
+15:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/32f9lky53xua8.js","async":true}]
+16:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true}]
+17:["$","$L21",null,{"children":["$","$1d",null,{"name":"Next.MetadataOutlet","children":"$@22"}]}]
+6:300
+22:null
+20:true
+6:C
+1f:0
+d:"$undefined"
+b:"$undefined"
+8:"$undefined"
+5:"$undefined"
+1e:"$undefined"
+18:"$undefined"

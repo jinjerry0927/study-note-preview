@@ -1,0 +1,232 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+a:"/study-note-preview/_next/static/chunks/2c33vaa8p24n3.js"
+b:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+c:I[51539,["$2","$a","$b"],"TopNPage"]
+12:"ViewportBoundary"
+13:I[97367,["$2"],"$12"]
+15:"MetadataBoundary"
+16:I[97367,["$2"],"$15"]
+17:"$Sreact.suspense"
+19:I[68027,["$2"],"default",1]
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+:HL["/study-note-preview/_next/static/media/GowunDodum_Regular-s.p.2u6_opv7t0qh4.ttf","font",{"crossOrigin":"","type":"font/ttf"}]
+:HL["/study-note-preview/_next/static/media/NanumPenScript_Regular-s.p.22x2mpm22vzmt.ttf","font",{"crossOrigin":"","type":"font/ttf"}]
+:HL["/study-note-preview/_next/static/chunks/1iuwalye34fli.css","style"]
+6:X
+d:T20f1,-- 06X 독립 실습: 06W 판매 8건을 값·기본키까지 그대로 재현한다.
+-- 기존 06V·06W 패키지 또는 GitHub 실행 원고는 덮어쓰지 않는다.
+CREATE TABLE sales (
+ sale_id INTEGER PRIMARY KEY,
+ region TEXT,
+ category TEXT NOT NULL,
+ amount INTEGER NOT NULL CHECK(amount >= 0),
+ sale_day INTEGER NOT NULL
+);
+INSERT INTO sales(sale_id,region,category,amount,sale_day) VALUES
+ (1,'서울','책',100,1),
+ (2,'서울','문구',50,2),
+ (3,'부산','책',80,1),
+ (4,'부산','문구',20,2),
+ (5,NULL,'책',30,1),
+ (6,'서울','책',80,3),
+ (7,'부산','책',80,3),
+ (8,'서울','문구',50,4);
+-- 점수(amount) 내림차순: 100×1, 80×3, 50×2, 30×1, 20×1.
+-- 모든 조회는 외부 ORDER BY로 화면 순서를 고정한다.
+
+-- A1: 상위 N을 고르기 전 8행 정렬
+SELECT sale_id,region,amount FROM sales ORDER BY amount DESC,sale_id ASC;
+
+-- A2: 정렬 후 첫 2행만 선택
+SELECT sale_id,amount FROM sales ORDER BY amount DESC,sale_id ASC LIMIT 2;
+
+-- A3: 상위 3행: 동점이어도 행 수 3
+SELECT sale_id,amount FROM sales ORDER BY amount DESC,sale_id ASC LIMIT 3;
+
+-- A4: 하위 2행: ASC로 방향 바꾸기
+SELECT sale_id,amount FROM sales ORDER BY amount ASC,sale_id ASC LIMIT 2;
+
+-- A5: 전체보다 N이 크면 있는 만큼만
+SELECT sale_id,amount FROM sales ORDER BY amount DESC,sale_id ASC LIMIT 20;
+
+-- B1: 원본 ID 순서에 1부터 번호 매기기
+SELECT sale_id,amount,ROW_NUMBER() OVER(ORDER BY sale_id) AS access_pos
+FROM sales ORDER BY sale_id;
+
+-- B2: 먼저 2행(ID순) 뽑고 나중에 금액 정렬
+WITH picked AS (
+SELECT sale_id,amount FROM sales ORDER BY sale_id LIMIT 2)
+SELECT sale_id,amount FROM picked ORDER BY amount DESC,sale_id;
+
+-- B3: ID순으로 선발한 두 행의 정렬 전 번호
+WITH numbered AS (
+SELECT sale_id,amount,ROW_NUMBER() OVER(ORDER BY sale_id) AS access_pos FROM sales)
+SELECT sale_id,amount,access_pos FROM numbered WHERE access_pos<=2
+ORDER BY amount DESC,sale_id;
+
+-- B4: ROW_NUMBER > 1은 Oracle ROWNUM > 1과 다름
+WITH numbered AS (
+SELECT sale_id,amount,ROW_NUMBER() OVER(ORDER BY sale_id) AS rn FROM sales)
+SELECT sale_id,rn FROM numbered WHERE rn>1 ORDER BY rn;
+
+-- B5: ID순 처음 3행과 실제 금액 상위 3행
+WITH by_id AS (
+SELECT sale_id FROM sales ORDER BY sale_id LIMIT 3),
+by_amount AS (
+SELECT sale_id FROM sales ORDER BY amount DESC,sale_id LIMIT 3)
+SELECT 'ID 선발' AS method,sale_id FROM by_id
+UNION ALL SELECT '금액 선발',sale_id FROM by_amount
+ORDER BY method,sale_id;
+
+-- C1: 인라인 뷰에 정렬을 두고 상위 2행
+SELECT sale_id,amount FROM (
+SELECT sale_id,amount FROM sales ORDER BY amount DESC,sale_id
+) AS sorted_sales ORDER BY amount DESC,sale_id LIMIT 2;
+
+-- C2: ROW_NUMBER를 이용해 확정된 상위 2행
+WITH ranked AS (
+SELECT sale_id,amount,ROW_NUMBER() OVER(ORDER BY amount DESC,sale_id) AS rn FROM sales)
+SELECT sale_id,amount,rn FROM ranked WHERE rn<=2 ORDER BY rn;
+
+-- C3: ROW_NUMBER 3~4행 구간
+WITH ranked AS (
+SELECT sale_id,amount,ROW_NUMBER() OVER(ORDER BY amount DESC,sale_id) AS rn FROM sales)
+SELECT sale_id,amount,rn FROM ranked WHERE rn BETWEEN 3 AND 4 ORDER BY rn;
+
+-- C4: 인라인 뷰에서 하위 2행 뽑기
+SELECT sale_id,amount FROM (
+SELECT sale_id,amount FROM sales ORDER BY amount ASC,sale_id
+) AS sorted_sales ORDER BY amount ASC,sale_id LIMIT 2;
+
+-- C5: 먼저 자격 조건을 적용한 뒤 상위 2행
+WITH eligible AS (SELECT sale_id,region,amount FROM sales WHERE region='서울')
+SELECT sale_id,amount FROM eligible ORDER BY amount DESC,sale_id LIMIT 2;
+
+-- D1: FETCH FIRST 2 ONLY 대응: LIMIT 2
+SELECT sale_id,amount FROM sales ORDER BY amount DESC,sale_id LIMIT 2;
+
+-- D2: OFFSET 2 FETCH NEXT 2 ONLY 대응
+SELECT sale_id,amount FROM sales ORDER BY amount DESC,sale_id LIMIT 2 OFFSET 2;
+
+-- D3: FETCH FIRST 2 WITH TIES 대응: 네 행
+WITH ranked AS (
+SELECT sale_id,amount,RANK() OVER(ORDER BY amount DESC) AS rnk FROM sales)
+SELECT sale_id,amount FROM ranked WHERE rnk<=2 ORDER BY amount DESC,sale_id;
+
+-- D4: WITH TIES도 보조 유일 키를 넣으면 두 행
+WITH ranked AS (
+SELECT sale_id,amount,RANK() OVER(ORDER BY amount DESC,sale_id) AS rnk FROM sales)
+SELECT sale_id,amount FROM ranked WHERE rnk<=2 ORDER BY amount DESC,sale_id;
+
+-- D5: OFFSET 1 FETCH 1 WITH TIES 대응
+WITH ranked AS (
+SELECT sale_id,amount,
+ROW_NUMBER() OVER(ORDER BY amount DESC,sale_id) AS pos FROM sales),
+border AS (SELECT amount FROM ranked WHERE pos=2)
+SELECT s.sale_id,s.amount FROM ranked s CROSS JOIN border b
+WHERE s.pos>1 AND s.amount=b.amount ORDER BY s.amount DESC,s.sale_id;
+
+-- E1: TOP(2) 대응: 제한 2행
+SELECT sale_id,amount FROM sales ORDER BY amount DESC,sale_id LIMIT 2;
+
+-- E2: TOP(2) WITH TIES 대응: 동점 세 행 포함
+WITH ranked AS (
+SELECT sale_id,amount,RANK() OVER(ORDER BY amount DESC) AS rnk FROM sales)
+SELECT sale_id,amount FROM ranked WHERE rnk<=2 ORDER BY amount DESC,sale_id;
+
+-- E3: TOP(2) WITH TIES: ID까지 정렬하면 2행
+WITH ranked AS (
+SELECT sale_id,amount,RANK() OVER(ORDER BY amount DESC,sale_id) AS rnk FROM sales)
+SELECT sale_id,amount FROM ranked WHERE rnk<=2 ORDER BY amount DESC,sale_id;
+
+-- E4: TOP(25) PERCENT 대응: 8행의 25%는 2행
+WITH numbered AS (
+SELECT sale_id,amount,ROW_NUMBER() OVER(ORDER BY amount DESC,sale_id) AS rn,
+COUNT(*) OVER() AS cnt FROM sales)
+SELECT sale_id,amount FROM numbered
+WHERE rn <= CAST((cnt*25+99)/100 AS INTEGER) ORDER BY rn;
+
+-- E5: 행 Top 2와 서로 다른 금액 Top 2
+SELECT amount FROM (SELECT DISTINCT amount FROM sales)
+ORDER BY amount DESC LIMIT 2;
+
+-- F1: LIMIT 2: 처음 두 행
+SELECT sale_id,amount FROM sales ORDER BY amount DESC,sale_id LIMIT 2;
+
+-- F2: LIMIT 2 OFFSET 2: 다음 두 행
+SELECT sale_id,amount FROM sales ORDER BY amount DESC,sale_id LIMIT 2 OFFSET 2;
+
+-- F3: LIMIT 2 OFFSET 6: 끝쪽 두 행
+SELECT sale_id,amount FROM sales ORDER BY amount DESC,sale_id LIMIT 2 OFFSET 6;
+
+-- F4: OFFSET 8: 건너뛸 8행 뒤에는 빈 결과
+SELECT sale_id,amount FROM sales ORDER BY amount DESC,sale_id LIMIT 2 OFFSET 8;
+
+-- F5: WHERE가 먼저 줄인 결과에서 OFFSET·LIMIT
+SELECT sale_id,region,amount FROM sales WHERE region='서울'
+ORDER BY amount DESC,sale_id LIMIT 2 OFFSET 1;
+
+-- G1: RANK로 Top 2: 판매행 4개
+WITH r AS (SELECT sale_id,amount,RANK() OVER(ORDER BY amount DESC) AS rnk FROM sales)
+SELECT sale_id,amount,rnk FROM r WHERE rnk<=2 ORDER BY amount DESC,sale_id;
+
+-- G2: DENSE_RANK로 금액 상위 2등급: 4행
+WITH r AS (SELECT sale_id,amount,DENSE_RANK() OVER(ORDER BY amount DESC) AS dense_no FROM sales)
+SELECT sale_id,amount,dense_no FROM r WHERE dense_no<=2 ORDER BY amount DESC,sale_id;
+
+-- G3: ROW_NUMBER Top 2: 정확히 2행
+WITH r AS (SELECT sale_id,amount,ROW_NUMBER() OVER(ORDER BY amount DESC,sale_id) AS rn FROM sales)
+SELECT sale_id,amount,rn FROM r WHERE rn<=2 ORDER BY rn;
+
+-- G4: RANK≤3: 여전히 4행
+WITH r AS (SELECT sale_id,amount,RANK() OVER(ORDER BY amount DESC) AS rnk FROM sales)
+SELECT sale_id,amount,rnk FROM r WHERE rnk<=3 ORDER BY amount DESC,sale_id;
+
+-- G5: DENSE_RANK≤3: 50까지 포함한 6행
+WITH r AS (SELECT sale_id,amount,DENSE_RANK() OVER(ORDER BY amount DESC) AS dense_no FROM sales)
+SELECT sale_id,amount,dense_no FROM r WHERE dense_no<=3 ORDER BY amount DESC,sale_id;
+
+-- H1: 각 지역별 Top 2 판매행: 모두 합해 5행
+WITH r AS (SELECT sale_id,region,amount,
+ROW_NUMBER() OVER(PARTITION BY region ORDER BY amount DESC,sale_id) AS rn FROM sales)
+SELECT sale_id,region,amount,rn FROM r WHERE rn<=2
+ORDER BY region IS NULL,region,amount DESC,sale_id;
+
+-- H2: 각 지역 공동 1위 모두: 부산은 두 건
+WITH r AS (SELECT sale_id,region,amount,
+RANK() OVER(PARTITION BY region ORDER BY amount DESC) AS rnk FROM sales)
+SELECT sale_id,region,amount,rnk FROM r WHERE rnk<=1
+ORDER BY region IS NULL,region,amount DESC,sale_id;
+
+-- H3: 각 지역 상위 두 금액 등급 전체
+WITH r AS (SELECT sale_id,region,amount,
+DENSE_RANK() OVER(PARTITION BY region ORDER BY amount DESC) AS dense_no FROM sales)
+SELECT sale_id,region,amount,dense_no FROM r WHERE dense_no<=2
+ORDER BY region IS NULL,region,amount DESC,sale_id;
+
+-- H4: NULL 지역도 분리된 파티션
+SELECT sale_id,region,amount,
+COUNT(*) OVER(PARTITION BY region) AS region_n
+FROM sales ORDER BY region IS NULL,region,sale_id;
+
+-- H5: 고유 키 기반 seek: 2건 이후 다음 2건
+SELECT sale_id,amount FROM sales
+WHERE amount < 80 OR (amount=80 AND sale_id>3)
+ORDER BY amount DESC,sale_id LIMIT 2;
+9:[["children",{"s":"__PAGE__","h":512,"d":{"r":["$","$1","c",{"children":[["$","$Lc",null,{"fullSql":"$d"}],["$Le","$Lf","$L10"],"$L11"]}],"p":false,"v":null}}]]
+8:[["children",{"s":"top-n","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$6"},"c":"$Q9"}]]
+7:[["children",{"s":"learn","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$6"},"c":"$Q8"}]]
+5:[["children",{"s":"sqld","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$6"},"c":"$Q7"}]]
+0:{"P":null,"c":["","sqld","learn","top-n",""],"q":"","i":false,"t":{"t":{"s":"","h":528,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true,"nonce":"$undefined"}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}]}]}]]}],"p":false,"v":null},"c":"$Q5"},"h":{"r":["$","$1","h",{"children":[null,["$","$L13",null,{"children":"$L14"}],["$","$L16",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$17",null,{"name":"Next.Metadata","children":"$L18"}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":false,"v":null}},"m":"$undefined","G":["$19",[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]]],"S":true,"r":"$undefined","s":"$undefined","a":"$undefined","l":"$undefined","p":"$undefined","d":"$undefined","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+1a:I[97367,["$2"],"OutletBoundary"]
+6:C
+e:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/1iuwalye34fli.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]
+f:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/2c33vaa8p24n3.js","async":true,"nonce":"$undefined"}]
+10:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true,"nonce":"$undefined"}]
+11:["$","$L1a",null,{"children":["$","$17",null,{"name":"Next.MetadataOutlet","children":"$@1b"}]}]
+14:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]
+18:[["$","title","0",{"children":"Top N 쿼리 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]
+1b:null

@@ -1,0 +1,9 @@
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+:HL["/study-note-preview/_next/static/media/GowunDodum_Regular-s.p.2u6_opv7t0qh4.ttf","font",{"crossOrigin":"","type":"font/ttf"}]
+:HL["/study-note-preview/_next/static/media/NanumPenScript_Regular-s.p.22x2mpm22vzmt.ttf","font",{"crossOrigin":"","type":"font/ttf"}]
+:HL["/study-note-preview/_next/static/chunks/0h4332b55nxmx.css","style"]
+4:[["children",{"s":"__PAGE__","h":160}]]
+3:[["children",{"s":"pivot-unpivot","h":96,"c":"$Q4"}]]
+2:[["children",{"s":"learn","h":96,"c":"$Q3"}]]
+1:[["children",{"s":"sqld","h":96,"c":"$Q2"}]]
+0:{"b":"tk7gMlxUJeIV7M9Ikfgsp","t":{"t":{"s":"","h":80,"c":"$Q1"}}}

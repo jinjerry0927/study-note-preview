@@ -1,0 +1,575 @@
+1:"$Sreact.fragment"
+2:"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js"
+3:I[39756,["$2"],"default"]
+4:I[37457,["$2"],"default"]
+a:"/study-note-preview/_next/static/chunks/21rnqlt94y00x.js"
+b:"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js"
+c:"/study-note-preview/_next/static/chunks/2kr623ix6ipgv.js"
+d:I[40891,["$2","$a","$b","$c"],"HierarchyPage"]
+14:"ViewportBoundary"
+15:I[97367,["$2"],"$14"]
+17:"MetadataBoundary"
+18:I[97367,["$2"],"$17"]
+19:"$Sreact.suspense"
+1b:I[68027,["$2"],"default",1]
+:HL["/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","style"]
+:HL["/study-note-preview/_next/static/media/GowunDodum_Regular-s.p.2u6_opv7t0qh4.ttf","font",{"crossOrigin":"","type":"font/ttf"}]
+:HL["/study-note-preview/_next/static/media/NanumPenScript_Regular-s.p.22x2mpm22vzmt.ttf","font",{"crossOrigin":"","type":"font/ttf"}]
+:HL["/study-note-preview/_next/static/chunks/1lppoqp8qjmeo.css","style"]
+6:X
+e:T6130,-- STUDY.note 06Y; 원본 데이터 11건(가상 조직도), 별도 순환 예제 3건.
+-- SQLite 3.46.1 실측. Oracle CONNECT BY 구문은 이 파일에 없습니다.
+CREATE TABLE org_employees (
+ emp_id TEXT PRIMARY KEY, emp_name TEXT NOT NULL,
+ parent_id TEXT REFERENCES org_employees(emp_id), sort_order INTEGER NOT NULL
+);
+INSERT INTO org_employees(emp_id,emp_name,parent_id,sort_order) VALUES
+ ('E100','대표',NULL,1),
+ ('E110','개발본부','E100',1),
+ ('E120','운영본부','E100',2),
+ ('E111','플랫폼팀','E110',1),
+ ('E112','데이터팀','E110',2),
+ ('E121','지원팀','E120',1),
+ ('E113','검색파트','E111',1),
+ ('E114','인프라파트','E111',2),
+ ('E122','고객파트','E121',1),
+ ('E200','연구소',NULL,2),
+ ('E210','실험팀','E200',1);
+-- 조직도와 섞지 않는 의도적 순환 데모: X1 → X2 → X3 → X1
+CREATE TABLE org_cycle_demo (node_id TEXT PRIMARY KEY, next_id TEXT NOT NULL);
+INSERT INTO org_cycle_demo VALUES ('X1','X2'),('X2','X3'),('X3','X1');
+
+
+-- 아래는 번호별 독립 조회 40건. 각 SELECT는 위 초기 데이터에 대해 실행하세요.
+
+
+-- [A1] 자신에게 상사를 연결하는 LEFT 셀프 조인
+SELECT c.emp_id, c.emp_name, p.emp_name AS parent_name
+FROM org_employees c LEFT JOIN org_employees p ON c.parent_id = p.emp_id ORDER BY c.emp_id;
+
+
+-- [A2] INNER 셀프 조인은 루트를 제외
+SELECT c.emp_id, c.emp_name, p.emp_id AS parent_id
+FROM org_employees c JOIN org_employees p ON c.parent_id=p.emp_id ORDER BY c.emp_id;
+
+
+-- [A3] 직속 자녀 0건도 세는 LEFT JOIN
+SELECT p.emp_id, p.emp_name, COUNT(c.emp_id) AS direct_children
+FROM org_employees p LEFT JOIN org_employees c ON c.parent_id=p.emp_id
+GROUP BY p.emp_id,p.emp_name ORDER BY p.emp_id;
+
+
+-- [A4] 같은 부모의 형제 노드 짝
+SELECT a.emp_id AS left_id,b.emp_id AS right_id,a.parent_id
+FROM org_employees a JOIN org_employees b ON a.parent_id=b.parent_id AND a.emp_id<b.emp_id
+WHERE a.parent_id IS NOT NULL ORDER BY a.parent_id,left_id,right_id;
+
+
+-- [A5] 셀프 조인 두 번으로 조부모까지
+SELECT c.emp_id,c.emp_name,p.emp_name AS parent_name,g.emp_name AS grandparent_name
+FROM org_employees c JOIN org_employees p ON c.parent_id=p.emp_id
+JOIN org_employees g ON p.parent_id=g.emp_id ORDER BY c.emp_id;
+
+
+-- [B1] 부모 키가 비어 있는 루트 두 건
+SELECT emp_id,emp_name,parent_id FROM org_employees WHERE parent_id IS NULL ORDER BY emp_id;
+
+
+-- [B2] E100의 직속 자녀
+SELECT emp_id,emp_name FROM org_employees WHERE parent_id='E100' ORDER BY sort_order,emp_id;
+
+
+-- [B3] E110 아래 모든 후손
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E110'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,emp_name,depth,name_path FROM walk ORDER BY sort_path;
+
+
+-- [B4] 루트부터 깊이별 노드 수
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE parent_id IS NULL
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT depth,COUNT(*) AS node_count FROM walk GROUP BY depth ORDER BY depth;
+
+
+-- [B5] 자식이 없는 원본 노드
+SELECT e.emp_id,e.emp_name FROM org_employees e
+WHERE NOT EXISTS(SELECT 1 FROM org_employees c WHERE c.parent_id=e.emp_id)
+ORDER BY e.emp_id;
+
+
+-- [C1] 대표에서 아래로: 부모 키에서 자녀 키로
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E100'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,emp_name,parent_id,depth FROM walk ORDER BY sort_path;
+
+
+-- [C2] 개발본부에서 시작
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E110'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,depth,name_path FROM walk ORDER BY sort_path;
+
+
+-- [C3] 연구소에서 시작
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E200'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,depth,name_path FROM walk ORDER BY sort_path;
+
+
+-- [C4] 인프라파트에서 위로: 역방향
+WITH RECURSIVE upward(emp_id,emp_name,parent_id,step) AS (
+ SELECT emp_id,emp_name,parent_id,1 FROM org_employees WHERE emp_id='E114'
+ UNION ALL
+ SELECT p.emp_id,p.emp_name,p.parent_id,u.step+1
+ FROM org_employees p JOIN upward u ON p.emp_id=u.parent_id
+ WHERE u.step<12
+)
+SELECT emp_id,emp_name,step FROM upward ORDER BY step;
+
+
+-- [C5] 두 루트 모두 시작
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE parent_id IS NULL
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT root_id,emp_id,depth FROM walk ORDER BY root_id,sort_path;
+
+
+-- [D1] 레벨 1은 시작 행
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E100'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,depth,name_path FROM walk ORDER BY depth,emp_id;
+
+
+-- [D2] 리프 판정
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE parent_id IS NULL
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT w.emp_id,w.depth,CASE WHEN NOT EXISTS(SELECT 1 FROM org_employees c WHERE c.parent_id=w.emp_id) THEN 1 ELSE 0 END AS is_leaf
+FROM walk w ORDER BY w.emp_id;
+
+
+-- [D3] LEVEL=3에 있는 팀만
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE parent_id IS NULL
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,emp_name,depth FROM walk WHERE depth=3 ORDER BY emp_id;
+
+
+-- [D4] LEVEL 2까지 제한
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE parent_id IS NULL
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<2 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,depth FROM walk ORDER BY sort_path;
+
+
+-- [D5] 시작점 E110에서 LEVEL 재계산
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E110'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,depth FROM walk ORDER BY sort_path;
+
+
+-- [E1] 대표 트리의 전체 이름 경로
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E100'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,root_name,name_path FROM walk ORDER BY sort_path;
+
+
+-- [E2] 다중 루트의 루트 이름
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE parent_id IS NULL
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,root_id,root_name FROM walk ORDER BY root_id,sort_path;
+
+
+-- [E3] 인프라파트의 조상 경로
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE parent_id IS NULL
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,name_path,depth FROM walk WHERE emp_id='E114' ORDER BY sort_path;
+
+
+-- [E4] 시작점을 E110으로 바꾸면 경로도 재시작
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E110'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,root_name,name_path FROM walk ORDER BY sort_path;
+
+
+-- [E5] 연구소 루트의 경로
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E200'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,name_path FROM walk ORDER BY sort_path;
+
+
+-- [F1] 동일 부모의 정렬 우선순위
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E100'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,depth,sort_path FROM walk ORDER BY sort_path;
+
+
+-- [F2] 형제 순서를 반대로
+WITH RECURSIVE rev(emp_id,emp_name,parent_id,depth,rev_path) AS (
+ SELECT emp_id,emp_name,parent_id,1,printf('%03d',100-sort_order)||'-'||emp_id FROM org_employees WHERE emp_id='E100'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,r.depth+1,r.rev_path||'/'||printf('%03d',100-c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN rev r ON c.parent_id=r.emp_id WHERE r.depth<12
+)
+SELECT emp_id,depth,rev_path FROM rev ORDER BY rev_path;
+
+
+-- [F3] 이름으로 전역 정렬하면 조직도 순서가 깨짐
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE parent_id IS NULL
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,emp_name,depth FROM walk ORDER BY emp_name,emp_id;
+
+
+-- [F4] 계층형 순서에 번호 붙이기
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE parent_id IS NULL
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT ROW_NUMBER() OVER(ORDER BY sort_path) AS display_seq,emp_id,depth FROM walk ORDER BY display_seq;
+
+
+-- [F5] 두 루트 아래를 각각 순서대로
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE parent_id IS NULL
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT root_name,emp_id,depth,sort_path FROM walk ORDER BY sort_path;
+
+
+-- [G1] 순환 데모의 원본 3행
+SELECT node_id,next_id FROM org_cycle_demo ORDER BY node_id;
+
+
+-- [G2] 방문 이력으로 순환 확장 중지
+WITH RECURSIVE cycle_walk(node_id,next_id,depth,visited) AS (
+ SELECT node_id,next_id,1,'|'||node_id||'|' FROM org_cycle_demo WHERE node_id='X1'
+ UNION ALL
+ SELECT d.node_id,d.next_id,w.depth+1,w.visited||d.node_id||'|'
+ FROM org_cycle_demo d JOIN cycle_walk w ON d.node_id=w.next_id
+ WHERE w.depth<8 AND instr(w.visited,'|'||d.node_id||'|')=0
+)
+SELECT node_id,depth,visited FROM cycle_walk WHERE 1=1 ORDER BY depth;
+
+
+-- [G3] 어느 행에서 순환 연결이 생기는가
+WITH RECURSIVE cycle_walk(node_id,next_id,depth,visited) AS (
+ SELECT node_id,next_id,1,'|'||node_id||'|' FROM org_cycle_demo WHERE node_id='X1'
+ UNION ALL
+ SELECT d.node_id,d.next_id,w.depth+1,w.visited||d.node_id||'|'
+ FROM org_cycle_demo d JOIN cycle_walk w ON d.node_id=w.next_id
+ WHERE w.depth<8 AND instr(w.visited,'|'||d.node_id||'|')=0
+)
+SELECT node_id,depth,CASE WHEN instr(visited,'|'||next_id||'|')>0 THEN 1 ELSE 0 END AS next_is_visited FROM cycle_walk WHERE 1=1 ORDER BY depth;
+
+
+-- [G4] 깊이 상한 2로 조기 종료
+WITH RECURSIVE cycle_walk(node_id,next_id,depth,visited) AS (
+ SELECT node_id,next_id,1,'|'||node_id||'|' FROM org_cycle_demo WHERE node_id='X1'
+ UNION ALL
+ SELECT d.node_id,d.next_id,w.depth+1,w.visited||d.node_id||'|'
+ FROM org_cycle_demo d JOIN cycle_walk w ON d.node_id=w.next_id
+ WHERE w.depth<2 AND instr(w.visited,'|'||d.node_id||'|')=0
+)
+SELECT node_id,depth FROM cycle_walk WHERE 1=1 ORDER BY depth;
+
+
+-- [G5] 정상 조직도의 방문 이력
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E100'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,depth,id_path FROM walk ORDER BY sort_path;
+
+
+-- [H1] 앵커 한 행과 재귀 단계
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E100'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,depth,root_id FROM walk ORDER BY depth,emp_id;
+
+
+-- [H2] 모든 루트에서 앵커
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE parent_id IS NULL
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,depth,root_id FROM walk ORDER BY depth,emp_id;
+
+
+-- [H3] 부모 키와 자식 키의 JOIN 방향
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E100'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,parent_id,depth FROM walk ORDER BY sort_path;
+
+
+-- [H4] 후처리 WHERE는 중간 행만 숨김
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E100'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (1=1)
+)
+SELECT emp_id,depth FROM walk WHERE emp_id<>'E110' ORDER BY sort_path;
+
+
+-- [H5] 재귀 JOIN의 조건은 가지를 끊음
+WITH RECURSIVE walk(emp_id, emp_name, parent_id, depth, root_id, root_name, id_path, name_path, sort_path) AS (
+ SELECT emp_id, emp_name, parent_id, 1, emp_id, emp_name,
+        '|'||emp_id||'|', '/'||emp_name,
+        printf('%03d',sort_order)||'-'||emp_id
+ FROM org_employees WHERE emp_id='E100'
+ UNION ALL
+ SELECT c.emp_id,c.emp_name,c.parent_id,w.depth+1,w.root_id,w.root_name,
+        w.id_path||c.emp_id||'|',w.name_path||'/'||c.emp_name,
+        w.sort_path||'/'||printf('%03d',c.sort_order)||'-'||c.emp_id
+ FROM org_employees c JOIN walk w ON c.parent_id=w.emp_id
+ WHERE w.depth<12 AND instr(w.id_path,'|'||c.emp_id||'|')=0 AND (c.emp_id<>'E110')
+)
+SELECT emp_id,depth FROM walk ORDER BY sort_path;
+9:[["children",{"s":"__PAGE__","h":512,"d":{"r":["$","$1","c",{"children":[["$","$Ld",null,{"fullSql":"$e"}],["$Lf","$L10","$L11","$L12"],"$L13"]}],"p":false,"v":null}}]]
+8:[["children",{"s":"hierarchical-queries-self-join","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$6"},"c":"$Q9"}]]
+7:[["children",{"s":"learn","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$6"},"c":"$Q8"}]]
+5:[["children",{"s":"sqld","h":512,"d":{"r":["$","$1","c",{"children":[null,["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","forbidden":"$undefined","unauthorized":"$undefined"}]]}],"p":false,"v":"$6"},"c":"$Q7"}]]
+0:{"P":null,"c":["","sqld","learn","hierarchical-queries-self-join",""],"q":"","i":false,"t":{"t":{"s":"","h":528,"d":{"r":["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}],["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/3qfy96eoyh-ek.js","async":true,"nonce":"$undefined"}]],["$","html",null,{"lang":"ko","className":"elASXW_variable JmXorq_variable","children":["$","body",null,{"children":["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}]}]}]]}],"p":false,"v":null},"c":"$Q5"},"h":{"r":["$","$1","h",{"children":[null,["$","$L15",null,{"children":"$L16"}],["$","$L18",null,{"children":[["$","div",null,{"hidden":true,"children":["$","$19",null,{"name":"Next.Metadata","children":"$L1a"}]}],null]}],["$","meta",null,{"name":"next-size-adjust","content":""}]]}],"p":false,"v":null}},"m":"$undefined","G":["$1b",[["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/0mwqy6qzdm720.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]]],"S":true,"r":"$undefined","s":"$undefined","a":"$undefined","l":"$undefined","p":"$undefined","d":"$undefined","b":"tk7gMlxUJeIV7M9Ikfgsp"}
+1c:I[97367,["$2"],"OutletBoundary"]
+6:C
+f:["$","link","0",{"rel":"stylesheet","href":"/study-note-preview/_next/static/chunks/1lppoqp8qjmeo.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]
+10:["$","script","script-0",{"src":"/study-note-preview/_next/static/chunks/21rnqlt94y00x.js","async":true,"nonce":"$undefined"}]
+11:["$","script","script-1",{"src":"/study-note-preview/_next/static/chunks/3gjuvrlphgh1n.js","async":true,"nonce":"$undefined"}]
+12:["$","script","script-2",{"src":"/study-note-preview/_next/static/chunks/2kr623ix6ipgv.js","async":true,"nonce":"$undefined"}]
+13:["$","$L1c",null,{"children":["$","$19",null,{"name":"Next.MetadataOutlet","children":"$@1d"}]}]
+16:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1"}]]
+1a:[["$","title","0",{"children":"계층형 질의와 셀프 조인 학습 노트 | STUDY.note"}],["$","meta","1",{"name":"description","content":"개념부터 차근차근, STUDY.note에서 SQLD 엔터티를 배우고 다섯 문제로 확인해 보세요."}]]
+1d:null
